@@ -1,0 +1,92 @@
+version: "3.5"
+
+services:
+    mysql:
+        image: ubuntu/mysql
+        container_name: fin_mysql
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: "${FIN_ASSET_PASSWORD:-password}"
+            MYSQL_USER: "${FIN_ASSET_USERNAME:-fin}"
+            MYSQL_PASSWORD: "${FIN_ASSET_PASSWORD:-password}"
+            MYSQL_DATABASE: "${FIN_ASSET_DEFAULT_DATABASE:-fin}"
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        volumes:
+            - fin_mysql:/var/lib/mysql
+        command: ["--default-authentication-plugin=mysql_native_password"]
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-ppassword"]
+            retries: 3
+            timeout: 5s
+        networks:
+            - "${FIN_NETWORK:-fin}"
+        labels:
+            - "TYPE=asset"
+            - "SERVICE=mysql"
+            - "SITE=-"
+
+    postgres:
+        image: postgres
+        container_name: fin_postgres
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_USER: "${FIN_ASSET_USERNAME:-fin}"
+            POSTGRES_PASSWORD: "${FIN_ASSET_PASSWORD:-password}"
+            POSTGRES_DB: "${FIN_ASSET_DEFAULT_DATABASE:-fin}"
+        volumes:
+            - fin_postgres:/var/lib/postgresql/data
+        restart: always
+        networks:
+            - "${FIN_NETWORK:-fin}"
+        labels:
+            - "TYPE=asset"
+            - "SERVICE=postgres"
+            - "SITE=-"
+
+    redis:
+        image: "redis:alpine"
+        container_name: fin_redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - fin_redis:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            retries: 3
+            timeout: 5s
+        networks:
+            - "${FIN_NETWORK:-fin}"
+        labels:
+            - "TYPE=asset"
+            - "SERVICE=redis"
+            - "SITE=-"
+
+    proxy:
+        image: "sharanvelu/dockr-proxy:latest"
+        container_name: fin_proxy
+        ports:
+            - "80:80"
+            - "443:443"
+        networks:
+            - "${FIN_NETWORK:-fin}"
+        labels:
+            - "TYPE=asset"
+            - "SERVICE=proxy"
+            - "SITE=http://fin"
+
+networks:
+    fin_network:
+        external: true
+
+volumes:
+    fin_mysql:
+        driver: local
+        name: fin_asset_mysql
+    fin_postgres:
+        driver: local
+        name: fin_asset_postgres
+    fin_redis:
+        driver: local
+        name: fin_asset_redis

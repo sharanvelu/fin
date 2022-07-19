@@ -1,0 +1,27 @@
+version: "3.7"
+services:
+    web:
+        image: "${FIN_DOCKER_IMAGE}"
+        container_name: "${FIN_CONTAINER_NAME}-web"
+        ports:
+            - "0:80"
+        volumes:
+            - "${PROJECT_ROOT_DIR}/:/var/www/html"
+            - fin_composer_cache:/root/.composer/cache
+        networks:
+            - "${FIN_NETWORK:-fin_network}"
+        environment:
+            FIN_COMPOSER_VERSION: "${FIN_COMPOSER_VERSION}"
+        labels:
+            - "TYPE=project"
+            - "SERVICE=web"
+            - "SITE=${DT_SITE:--}"
+
+networks:
+    fin:
+        external: true
+
+volumes:
+    fin_composer_cache:
+        name: fin_composer_cache
+        external: true

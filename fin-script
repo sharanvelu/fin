@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -a
+
+# Project Root Dir
+PROJECT_ROOT_DIR="$(pwd)"
+
+# Source the ".env" file so Laravel environment variables are available
+if [ -f "${PROJECT_ROOT_DIR}/.env" ]; then
+    . "${PROJECT_ROOT_DIR}/.env"
+fi
+
+# Project Root Dir
+PROJECT_ROOT_DIR="$(pwd)"
+
+# System Home Dir
+SYSTEM_HOME="${HOME}"
+APPLICATION_HOME="/Users/sharan/Projects/dockr-python"
+
+set +a
+
+~/Projects/dockr-python/fin $@

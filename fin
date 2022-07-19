@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+
+# Custom Import
+from helpers.System import System
+from helpers.Application import Application
+from helpers.Docker import Env
+from helpers.Command import Command
+
+system = System()
+app = Application()
+command = Command()
+
+if command.getCommand() in ['up']:
+    from bin.Container import Container
+
+    method = getattr(Container(), command.getCommand())
+    method(command.getActions())
+else :
+    print('None known command given...')
+
+system.terminate()
+system.run(
+    'docker-compose -f /Users/sharan/dockr/res/dockr-compose.yml -p dockr_asset up -d web', True)
