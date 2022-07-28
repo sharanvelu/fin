@@ -14,3 +14,6 @@ class Color:
 
     # Process Indicator
     process = cyan + '=> ' + clear
+
+    # Process Indicator
+    error = red + '#### ' + clear

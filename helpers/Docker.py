@@ -40,7 +40,7 @@ class Docker:
         self.image = system.env('DOCKR_DOCKER_IMAGE', defaultImage)
 
         # Container Name
-        system.env('DOCKR_CONTAINER_NAME', self.projectName)
+        self.containerName = system.env('DOCKR_CONTAINER_NAME', self.projectName)
 
     def checkNetwork(self):
         output = system.run('docker network ls | grep -w ' + self.network, True)
@@ -67,6 +67,10 @@ class Asset:
     # Default Database
     database = app.name.lower()
 
+    # Is Asset Up # Todo
+    def isAssetUp(self, asset):
+        return True
+
 
 class Feature:
     # Composer Version
@@ -77,7 +81,7 @@ class Feature:
 
     def __init__(self):
         self.composerVersion = system.env('DOCKR_COMPOSER_VERSION', '2')
-        self.site = system.env('DOCKR_SITE')
+        self.site = 'http://' + system.env('DOCKR_SITE')
 
 
 class Env:
@@ -97,8 +101,7 @@ class Env:
 
         # Docker
         system.setEnv('FIN_NETWORK', docker.network)
-        system.setEnv('FIN_COMPOSER_CACHE_VOLUME',
-                      docker.composerCacheVolume)
+        system.setEnv('FIN_COMPOSER_CACHE_VOLUME', docker.composerCacheVolume)
 
         # Project
         system.setEnv('PROJECT_ROOT_DIR', docker.projectDir)
@@ -108,12 +111,48 @@ class Env:
 
         # Features
         system.setEnv('FIN_COMPOSER_VERSION', feature.composerVersion)
+        system.setEnv('FIN_SITE', feature.site)
 
     # Check whether the required ENV var are present
     def checkRequiredEnv(self):
         if system.env('DOCKR_SITE') == None:
-            system.printLn('Required Parameter ' + Color.cyan + 'DOCKR_SITE' + Color.clear + ' is ' +
-                           Color.red + 'missing' + Color.clear + ' from ' + Color.cyan + '.env' + Color.clear)
+            system.printLn('Required Parameter ' + Color.cyan + 'DOCKR_SITE' + Color.clear + ' is ' + Color.red + 'missing' + Color.clear + ' from ' + Color.cyan + '.env' + Color.clear)
 
             # Terminate execution as required params is not present
             system.terminate()
+
+class Proxy:
+    def setupProxy(self, containerPort):
+        # Check if Asset Up
+        if Asset().isAssetUp('proxy'):
+            self.__checkSiteInHosts()
+
+            system.printProcess('Setting Up Proxy...')
+            self.__addSiteToProxy(system.env('DOCKR_SITE'), 'http://host.docker.internal:' + containerPort)
+
+    def __checkSiteInHosts(self):
+        site = Feature().site
+        if '*' in Feature().site:
+            system.print('Make sure you have added the appropriate site (')
+            system.print(' ' + site)
+            system.print(' ) in')
+            system.print(' /etc/hosts', Color.cyan)
+            system.printLn(' file')
+        else:
+            if system.run('grep -w ' + site + ' /etc/hosts', True) is not None:
+                system.print('Specified site is not present in')
+                system.print(' /etc/hosts', Color.cyan)
+                system.printLn(' File')
+                system.print('Kindly add the site')
+                system.printLn(' ' + Feature().site + ' in the /etc/hosts file')
+
+    def __addSiteToProxy(self, actualSite, proxySite):
+        try :
+            dockerComposeCommand = 'docker-compose -f ' + app.assetDockerComposeFile + ' -p ' + app.name.lower() + '_asset'
+            command = dockerComposeCommand + ' exec proxy bash -c "add-listener ' + actualSite + ' ' + proxySite + ' >> /dev/null"'
+            system.run(command)
+            system.printLn('Your Application should be running at '+ color.red + color.underline + Feature().site + Color.clear)
+        except :
+            system.printError('Unable to configure proxy. Please check your configurations.')
+
+

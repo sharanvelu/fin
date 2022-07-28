@@ -20,4 +20,5 @@ class Application:
     binDir = home + 'bin'
 
     # Files
-    dockerComposeFile = home + '/docker-compose-asset.yml'
+    assetDockerComposeFile = home + '/docker-compose-asset.yml'
+    serverDockerComposeFile = home + '/docker-compose-server.yml'

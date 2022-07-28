@@ -18,7 +18,7 @@ class System:
 
     # Print Output in the terminal
     # Customize color and style of
-    def printOutput(self, text, color, newLine=False, style=''):
+    def __printOutput(self, text, color, newLine=False, style=''):
         if text:
             if newLine:
                 print(color + style + text + Color.clear)
@@ -29,11 +29,11 @@ class System:
 
     # Print a statement
     def print(self, text, color='', style=''):
-        self.printOutput(text, color, False, style)
+        self.__printOutput(text, color, False, style)
 
     # Print a statement and add a new Line
     def printLn(self, text, color='', style=''):
-        self.printOutput(text, color, True, style)
+        self.__printOutput(text, color, True, style)
 
     # Print an Empty Line
     def printEmptyLn(self):
@@ -41,7 +41,11 @@ class System:
 
     # Print a statement with a Process indicator
     def printProcess(self, text, color='', style=''):
-        self.printOutput(Color.process + text, color, True, style)
+        self.__printOutput(Color.process + text, color, True, style)
+
+    # Print a statement with a Error indicator
+    def printError(self, text, color='', style=''):
+        self.__printOutput(Color.error + text, color, True, style)
 
     # Run a system command
     def run(self, command, onlyFirstLineOnly=False):
