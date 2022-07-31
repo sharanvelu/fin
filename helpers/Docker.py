@@ -42,7 +42,7 @@ class Asset:
     database = applicationName
     projectName = applicationName + '_asset'
 
-    def isAssetUp(self, assets, checkAll = False):
+    def isUp(self, assets, checkAll = False):
         # Todo
         return True
 
@@ -96,7 +96,7 @@ class Proxy:
 
     def setupProxy(self, containerPort):
         # Check if Asset Up
-        if Asset().isAssetUp(['proxy'], True) and containerPort is not None:
+        if Asset().isUp(['proxy'], True) and containerPort is not None:
             self.__checkSiteInHosts()
 
             output.process('Setting Up Proxy...')
