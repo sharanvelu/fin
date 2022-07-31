@@ -18,7 +18,7 @@ class Container:
         # print(Network().getInfoFromServer())
 
         # Check for required ENV
-        self.__checkRequiredEnv()
+        self.env.checkEnvExistence(['SITE'])
 
         # Check pDocker Private network existence
         self.docker.checkNetwork()
@@ -31,15 +31,6 @@ class Container:
 
         # Setup Proxy
         Proxy().setupProxy(self.__getContainerPort())
-
-    # Check whether the required ENV var are present
-    def __checkRequiredEnv(self):
-        if self.env.env('SITE') == None:
-            Output().printLn('Required Parameter ' + Color.cyan + self.env.getName('SITE') + Color.clear + ' is ' +
-                             Color.red + 'missing' + Color.clear + ' from' + Color.cyan + ' .env' + Color.clear)
-
-            # Terminate execution as required params is not present
-            System().terminate()
 
     # Start the Project Container
     def __startProjectContainer(self):

@@ -25,20 +25,6 @@ class Env:
 
     # Put Required Env into OS environments
     def setEnvs(self, envs):
-        # docker = Docker()
-        # asset = Asset()
-
-        # envs = {
-        #     'CONTAINER_NAME': docker.containerName,
-        #     'FIN_ASSET_USERNAME': asset.username,
-        #     'FIN_ASSET_PASSWORD': asset.password,
-        #     'FIN_ASSET_DEFAULT_DATABASE': asset.database,
-        #     'FIN_NETWORK': docker.network,
-        #     'FIN_COMPOSER_CACHE_VOLUME': docker.composerCacheVolume,
-        #     'PROJECT_ROOT_DIR': docker.projectDir,
-        #     'FIN_DOCKER_IMAGE': docker.image,
-        # }
-
         for env in envs:
             self.setEnv(env, envs[env])
 
@@ -46,3 +32,19 @@ class Env:
         # 'FIN_COMPOSER_CACHE_VOLUME': self.docker.composerCacheVolume,
         # self.setEnv('FIN_COMPOSER_VERSION', laravel.composerVersion)
         # self.setEnv('FIN_SITE', docker.site)
+
+    def checkEnvExistence(self, envs):
+        output = Output()
+        missingEnvs = []
+        for env in envs:
+            if self.env(env) == None:
+                missingEnvs.append(self.getName(env))
+
+        if len(missingEnvs) > 0:
+            output.print('Required Parameter ')
+            output.print(Color.cyan + (Color.clear + ', ' + Color.cyan).join(missingEnvs))
+            output.print(' is' + Color.red + ' missing ')
+            output.printLn(' from' + Color.cyan + ' .env' + Color.clear + ' file.')
+
+            System().terminate()
+

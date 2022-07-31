@@ -13,10 +13,11 @@
 # ------------------------------------------------------
 
 # Custom Import
-from helpers.Command import Command
+from helpers.Command import Command, Output
 from helpers.System import System
 
 command = Command()
+output = Output()
 system = System()
 
 if command.getCommand() in ['up']:
@@ -25,7 +26,13 @@ if command.getCommand() in ['up']:
     method = getattr(Container(), command.getCommand())
     method(command.getActions())
 else:
-    system.printLn('Help')
-    print('None known command given...')
+    output.printLn('Help')
+    output.printLn('None known command given...')
 
 system.terminate()
+
+# # # # Import dynamic Classes
+# nameSpace = __import__('plugins.Laravel')
+# module = getattr(nameSpace, 'Laravel')
+# pluginClass = getattr(module, 'Laravel')
+# method = getattr(pluginClass, 'image')
