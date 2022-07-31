@@ -29,6 +29,12 @@ class Docker:
             system.run('docker network create ' + self.network)
             output.printLn('Network ' + Color.green + 'Created ' + Color.clear + 'Successfully.\n')
 
+    def getContainerIds(self):
+        containerIds = []
+        for x in system.run('docker ps -f "network=' + self.network + '" -q -a', False, True):
+            containerIds.append(x.replace('\n', ''))
+        return containerIds
+
 
 class Asset:
     username = applicationName

@@ -7,13 +7,13 @@ class System:
     home = os.getenv('SYSTEM_HOME')
 
     # Run a system command
-    def run(self, command, onlyFirstLineOnly=False):
+    def run(self, command, onlyFirstLineOnly=False, outputAsArray = False):
         output = os.popen(command).readlines()
 
         if onlyFirstLineOnly:
             return output[0].replace('\n', '') if len(output) > 0 else None
 
-        return str(output)
+        return output if outputAsArray else str(output)
 
     # Terminate execution
     def terminate(self):

@@ -20,11 +20,11 @@ command = Command()
 output = Output()
 system = System()
 
-if command.getCommand() in ['up']:
+if command.getCommand() in ['up', 'down', 'stop']:
     from bin.Container import Container
 
     method = getattr(Container(), command.getCommand())
-    method(command.getActions())
+    method(command)
 else:
     output.printLn('Help')
     output.printLn('None known command given...')

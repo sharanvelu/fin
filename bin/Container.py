@@ -1,9 +1,10 @@
 from helpers.Application import Application
 from helpers.Color import Color
-from helpers.Command import Output
+from helpers.Command import Command, Output
 from helpers.Docker import Asset, Docker, Proxy
 from helpers.Env import Env
 from helpers.System import System
+
 
 class Container:
     app = Application()
@@ -13,7 +14,7 @@ class Container:
     system = System()
     output = Output()
 
-    def up(self, actions=[]):
+    def up(self, command):
         # Print Info From Server
         # print(Network().getInfoFromServer())
 
@@ -31,6 +32,20 @@ class Container:
 
         # Setup Proxy
         Proxy().setupProxy(self.__getContainerPort())
+
+    def down(self, command):
+        if 'all' in command.getActions():
+            self.__terminateAll(command.getFlags())
+        else:
+            self.system.run('docker-compose -f ' + self.app.serverDockerComposeFile + ' -p ' + self.docker.serverProjectName + ' down')
+            self.output.printLn('Server containers' + Color.red + ' terminated' + Color.clear + ' Successfully...')
+
+    def stop(self, command):
+        if 'all' in command.getActions():
+            self.__stopAll()
+        else:
+            self.system.run('docker-compose -f ' + self.app.serverDockerComposeFile + ' -p ' + self.docker.serverProjectName + ' stop')
+            self.output.printLn('Server containers' + Color.red + ' stopped' + Color.clear + ' Successfully...')
 
     # Start the Project Container
     def __startProjectContainer(self):
@@ -59,10 +74,34 @@ class Container:
         self.output.emptyLn()
 
     def __getContainerPort(self):
-        exposedPort = self.system.run(
-            'docker ps --filter "name=' + self.docker.containerName + '" --format "{{.Ports}}" -a', True)
+        exposedPort = self.system.run('docker ps --filter "name=' + self.docker.containerName + '" --format "{{.Ports}}" -a', True)
         try:
             exposedPort = exposedPort.split(':')[1]
             return exposedPort.split('-')[0]
         except:
             return None
+
+    def __terminateAll(self, flags):
+        containerIds = self.docker.getContainerIds()
+        if len(containerIds) > 0:
+            if 'f' in flags:
+                self.__removeAllContainers(containerIds, 'f' in flags)
+            else:
+                self.__stopAllContainers(containerIds)
+                self.__removeAllContainers(containerIds)
+        else:
+            self.output.printLn(Color.red + 'No containers' + Color.clear + ' left to terminate...')
+
+    def __stopAllContainers(self, containerIds):
+        self.output.process('Stopping all containers...')
+        self.system.run('docker stop ' + (' '.join(containerIds)) + ' >> /dev/null')
+        self.output.printLn('All containers' + Color.red + ' stopped' + Color.clear + ' successfully.')
+
+    def __removeAllContainers(self, containerIds, force=False):
+        self.system.run('docker rm ' + ('-f ' if force else '') + (' '.join(containerIds)) + ' >> /dev/null')
+        self.output.printLn('All containers ' + Color.red + ('force ' if force else '') + 'removed' + Color.clear + ' successfully.')
+
+    def __stopAll(self):
+        containerIds = self.docker.getContainerIds()
+        if len(containerIds) > 0:
+            self.__stopAllContainers(containerIds)

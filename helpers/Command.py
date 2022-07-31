@@ -14,6 +14,9 @@ class Command:
     def getActions(self):
         return self.actions
 
+    def getFlags(self):
+        return self.flags
+
     def getOptions(self):
         return self.options
 
@@ -31,14 +34,17 @@ class Command:
         self.all = sys.argv[1:]
         self.options = {}
         self.actions = []
-        for command in self.all[1:]:
-            if(command.startswith('--')):
-                optionData = command.replace('--', '').split('=')
+        self.flags = []
+        for arg in self.all[1:]:
+            if(arg.startswith('--')):
+                optionData = arg.replace('--', '').split('=')
                 option = optionData[0]
                 value = optionData[1] if len(optionData) > 1 else None
                 self.options[option] = value
+            elif(arg.startswith('-')):
+                self.flags.append(arg.replace('-', ''))
             else:
-                self.actions.append(command)
+                self.actions.append(arg)
 
 class Output:
     # Print Output in the terminal
