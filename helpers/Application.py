@@ -1,22 +1,23 @@
 # Custom Import
+import os
 from helpers.System import System
 
-system = System()
 
 class Application:
-    # Application Vars
-    name = "Fin"
+    system = System()
 
-    # Home
-    systemHome = system.env('SYSTEM_HOME')
-    # home = systemHome + '/' + name.lower()
-    home = system.env('APPLICATION_HOME')
+    # Application Vars
+    name = 'Fin'
+
+    # todo : change the lines
+    # home = '/usr/local/lib'
+    home = os.getenv('APPLICATION_HOME')
 
     # Version
-    version = "v2.0"
+    version = 'v2.0'
 
     # Directories
-    configDir = systemHome + '/.config/' + name.lower()
+    configDir = system.home + '/.config/' + name.lower()
     binDir = home + 'bin'
 
     # Files

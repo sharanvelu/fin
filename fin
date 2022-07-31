@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 
-# Custom Import
-from helpers.System import System
-from helpers.Application import Application
-from helpers.Docker import Env, Feature
-from helpers.Command import Command
-from helpers.Colors import Color
+# ------------------------------------------------------
 
-system = System()
-app = Application()
+# from helpers.Docker import Asset
+# from helpers.Env import Env
+
+# print(Asset().canStartAsset('mysql'))
+
+# raise SystemExit
+
+
+# ------------------------------------------------------
+
+# Custom Import
+from helpers.Command import Command
+from helpers.System import System
+
 command = Command()
+system = System()
 
 if command.getCommand() in ['up']:
     from bin.Container import Container
 
     method = getattr(Container(), command.getCommand())
     method(command.getActions())
-else :
+else:
     system.printLn('Help')
     print('None known command given...')
 

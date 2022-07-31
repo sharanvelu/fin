@@ -1,158 +1,124 @@
 # Custom Import
-from helpers.Colors import Color
+from helpers.Color import Color
+from helpers.Command import Output
+from helpers.Config import Config
 from helpers.System import System
+from helpers.Env import Env
 from helpers.Application import Application
 
 app = Application()
+env = Env()
+output = Output()
 system = System()
-color = Color()
+
+applicationName = app.name.lower()
 
 
 class Docker:
-    # Network
-    network = app.name.lower() + '_network'
-
-    # Composer Cache Volume
-    composerCacheVolume = app.name.lower() + '_composer_cache_1'
-
-    # Project Name
-    assetProjectName = app.name.lower() + '_asset'
-    projectName = ''
-    projectDir = ''
-
-    # Image
-    image = ''
-
-    # PHP Version
-    phpVersion = ''
-
-    # Container Name
-    containerName = ''
+    network = applicationName + '_network'
+    site = Env().env('SITE')
 
     def __init__(self):
-        self.projectDir = system.env('PROJECT_ROOT_DIR')
-        projectDirArray = self.projectDir.split('/')
-        self.projectName = projectDirArray[-1].replace(' ', '-').lower()
-
-        # Image
-        self.phpVersion = system.env('DOCKR_PHP_VERSION', 'latest')
-        defaultImage = 'sharanvelu/laravel-php' + self.phpVersion
-        self.image = system.env('DOCKR_DOCKER_IMAGE', defaultImage)
-
-        # Container Name
-        self.containerName = system.env('DOCKR_CONTAINER_NAME', self.projectName)
+        self.serverProjectDir = system.run('pwd', True)
+        self.serverProjectName = system.run('basename `pwd`', True)
+        self.containerName = self.serverProjectName + '-server'
 
     def checkNetwork(self):
-        output = system.run('docker network ls | grep -w ' + self.network, True)
-        if str(output).find(self.network) == -1:
-            system.printLn('Creating ' + Color.cyan + app.name + Color.clear + ' Network.')
+        if str(system.run('docker network ls | grep -w ' + self.network, True)).find(self.network) == -1:
+            output.printLn('Creating ' + Color.cyan + applicationName + Color.clear + ' Network.')
             system.run('docker network create ' + self.network)
-            system.printLn('Network ' + Color.green + 'Created ' + Color.clear + 'Successfully.\n')
-
-    def checkComposerCacheVolume(self):
-        output = system.run('docker volume ls | grep -w ' + self.composerCacheVolume, True)
-        if str(output).find(self.composerCacheVolume) == -1:
-            system.printLn('Creating ' + Color.cyan + app.name + Color.clear + ' Composer Cache Volume.')
-            system.run('docker volume create ' + self.composerCacheVolume)
-            system.printLn('Composer Cache Volume ' + Color.green + 'Created ' + Color.clear + 'Successfully.\n')
+            output.printLn('Network ' + Color.green + 'Created ' + Color.clear + 'Successfully.\n')
 
 
 class Asset:
-    # Username
-    username = app.name.lower()
-
-    # password
+    username = applicationName
     password = 'password'
+    database = applicationName
+    projectName = applicationName + '_asset'
 
-    # Default Database
-    database = app.name.lower()
-
-    # Is Asset Up # Todo
-    def isAssetUp(self, asset):
+    def isAssetUp(self, assets, checkAll = False):
+        # Todo
         return True
 
+    # Check Asset Container status
+    def checkAssetContainer(self):
+        if env.env('SKIP_ASSET') == '1':
+            output.printLn(Color.cyan + env.getName('SKIP_ASSET') + Color.clear + ' is provided, Skipping Asset containers and DB check.\n')
+            if env.env('OVERRIDE_ASSET_CONFIG') != None:
+                output.printLn(Color.red + 'Warning : ' + Color.cyan + env.getName('OVERRIDE_ASSET_CONFIG') + Color.clear + ' will be ignored.\n')
 
-class Feature:
-    # Composer Version
-    composerVersion = ''
+            output.process('Starting Proxy Container...')
+            self.__startAssetContainer(['proxy'])
+            output.printLn('Proxy Container' + Color.green + ' started' + Color.clear + ' Successfully.\n')
+        else:
+            output.process('Starting Asset Containers...')
+            self.__startAssetContainer(self.__getAllowedAssets(env.env('ASSET_CONFIG_OVERRIDE', [])))
+            output.printLn('Asset Containers' + Color.green + ' started' + Color.clear + ' Successfully.\n')
 
-    # Site
-    site = ''
+    # Start Asset Containers
+    def __startAssetContainer(self, assets):
+        dockerComposeCommand = 'docker-compose -f ' + app.assetDockerComposeFile + ' -p ' + self.projectName
 
-    def __init__(self):
-        self.composerVersion = system.env('DOCKR_COMPOSER_VERSION', '2')
-        self.site = 'http://' + system.env('DOCKR_SITE')
+        # Todo : Check if the containers are already running before starting them again.
+        # output = self.system.run(dockerComposeCommand + ' ps | grep -E \'' + "|".join(assets) + '\' | grep exited')
 
+        system.run(dockerComposeCommand + ' up -d ' + " ".join(assets))
+        output.emptyLn()
+    
+    def __getAllowedAssets(self, override = ''):
+        config = Config(app.configDir + '/assets')
 
-class Env:
-    # Put Required Env into OS environments
-    def putRequiredEnv(self):
-        docker = Docker()
-        asset = Asset()
-        feature = Feature()
+        if config.getSection('assets', None) is None:
+            defaultConfigValues = {'mysql' : True, 'postgres' : True, 'Redis' : True, 'Proxy' : True}
+            config.set('assets', defaultConfigValues)
 
-        # Container
-        system.setEnv('FIN_CONTAINER_NAME', docker.containerName)
+        # By Default, Proxy container will be started
+        allowedAssets = ['proxy']
+        for asset in ['mysql', 'postgres', 'Redis']:
+            if config.get('assets', asset.capitalize()) == 'True' or asset.lower() in override :
+                # if configValues[x] == 'True' or x.lower() in override:
+                allowedAssets.append(asset.lower())
 
-        # Asset
-        system.setEnv('FIN_ASSET_USERNAME', asset.username)
-        system.setEnv('FIN_ASSET_PASSWORD', asset.password)
-        system.setEnv('FIN_ASSET_DEFAULT_DATABASE', asset.database)
+        return allowedAssets
 
-        # Docker
-        system.setEnv('FIN_NETWORK', docker.network)
-        system.setEnv('FIN_COMPOSER_CACHE_VOLUME', docker.composerCacheVolume)
+    def canStartAsset(self, asset):
+        return asset.lower() in self.__getAllowedAssets(env.env('ASSET_CONFIG_OVERRIDE', []))
 
-        # Project
-        system.setEnv('PROJECT_ROOT_DIR', docker.projectDir)
-
-        # Docker Image
-        system.setEnv('FIN_DOCKER_IMAGE', docker.image)
-
-        # Features
-        system.setEnv('FIN_COMPOSER_VERSION', feature.composerVersion)
-        system.setEnv('FIN_SITE', feature.site)
-
-    # Check whether the required ENV var are present
-    def checkRequiredEnv(self):
-        if system.env('DOCKR_SITE') == None:
-            system.printLn('Required Parameter ' + Color.cyan + 'DOCKR_SITE' + Color.clear + ' is ' + Color.red + 'missing' + Color.clear + ' from ' + Color.cyan + '.env' + Color.clear)
-
-            # Terminate execution as required params is not present
-            system.terminate()
 
 class Proxy:
+    site = Docker().site
+
     def setupProxy(self, containerPort):
         # Check if Asset Up
-        if Asset().isAssetUp('proxy'):
+        if Asset().isAssetUp(['proxy'], True) and containerPort is not None:
             self.__checkSiteInHosts()
 
-            system.printProcess('Setting Up Proxy...')
-            self.__addSiteToProxy(system.env('DOCKR_SITE'), 'http://host.docker.internal:' + containerPort)
+            output.process('Setting Up Proxy...')
+            self.__addSiteToProxy(env.env('SITE'), 'http://host.docker.internal:' + containerPort)
+        else :
+            self.__printProxyError()
 
     def __checkSiteInHosts(self):
-        site = Feature().site
-        if '*' in Feature().site:
-            system.print('Make sure you have added the appropriate site (')
-            system.print(' ' + site)
-            system.print(' ) in')
-            system.print(' /etc/hosts', Color.cyan)
-            system.printLn(' file')
+        if '*' in self.site:
+            output.print('Make sure you have added the appropriate site (')
+            output.print(' ' + self.site)
+            output.print(' ) in')
+            output.print(' /etc/hosts', Color.cyan)
+            output.printLn(' file')
         else:
-            if system.run('grep -w ' + site + ' /etc/hosts', True) is not None:
-                system.print('Specified site is not present in')
-                system.print(' /etc/hosts', Color.cyan)
-                system.printLn(' File')
-                system.print('Kindly add the site')
-                system.printLn(' ' + Feature().site + ' in the /etc/hosts file')
+            if system.run('grep -w ' + self.site + ' /etc/hosts', True) is None:
+                output.printLn('Specified site is not present in' + Color.cyan + ' /etc/hosts' + Color.clear + ' File.')
+                output.printLn('Kindly add the site ' + self.site + ' in the /etc/hosts file')
+                output.emptyLn()
 
     def __addSiteToProxy(self, actualSite, proxySite):
-        try :
-            dockerComposeCommand = 'docker-compose -f ' + app.assetDockerComposeFile + ' -p ' + app.name.lower() + '_asset'
+        try:
+            dockerComposeCommand = 'docker-compose -f ' + app.assetDockerComposeFile + ' -p ' + Asset().projectName
             command = dockerComposeCommand + ' exec proxy bash -c "add-listener ' + actualSite + ' ' + proxySite + ' >> /dev/null"'
             system.run(command)
-            system.printLn('Your Application should be running at '+ color.red + color.underline + Feature().site + Color.clear)
-        except :
-            system.printError('Unable to configure proxy. Please check your configurations.')
-
-
+            output.printLn('Your Application should be running at ' + Color.red + Color.underline + 'http://' + self.site + Color.clear)
+        except:
+            self.__printProxyError()
+    
+    def __printProxyError(self):
+        output.error('Unable to configure proxy. Please check your configurations.')

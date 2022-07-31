@@ -20,7 +20,7 @@ services:
             retries: 3
             timeout: 5s
         networks:
-            - "${FIN_NETWORK:-fin}"
+            - "${FIN_NETWORK:-fin_network}"
         labels:
             - "TYPE=asset"
             - "SERVICE=mysql"
@@ -39,7 +39,7 @@ services:
             - fin_postgres:/var/lib/postgresql/data
         restart: always
         networks:
-            - "${FIN_NETWORK:-fin}"
+            - "${FIN_NETWORK:-fin_network}"
         labels:
             - "TYPE=asset"
             - "SERVICE=postgres"
@@ -57,7 +57,7 @@ services:
             retries: 3
             timeout: 5s
         networks:
-            - "${FIN_NETWORK:-fin}"
+            - "${FIN_NETWORK:-fin_network}"
         labels:
             - "TYPE=asset"
             - "SERVICE=redis"
@@ -70,7 +70,7 @@ services:
             - "80:80"
             - "443:443"
         networks:
-            - "${FIN_NETWORK:-fin}"
+            - "${FIN_NETWORK:-fin_network}"
         labels:
             - "TYPE=asset"
             - "SERVICE=proxy"

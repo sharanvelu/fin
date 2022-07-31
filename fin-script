@@ -11,7 +11,8 @@ if [ -f "${PROJECT_ROOT_DIR}/.env" ]; then
 fi
 
 # Project Root Dir
-PROJECT_ROOT_DIR="$(pwd)"
+FIN_PROJECT_ROOT_DIR="$(pwd)"
+FIN_PROJECT_NAME=$(basename `pwd`)
 
 # System Home Dir
 SYSTEM_HOME="${HOME}"

@@ -1,5 +1,8 @@
 import sys
 
+# Custom Import
+from helpers.Color import Color
+
 
 class Command:
     def getArgs(self):
@@ -34,5 +37,37 @@ class Command:
                 option = optionData[0]
                 value = optionData[1] if len(optionData) > 1 else None
                 self.options[option] = value
-            else :
+            else:
                 self.actions.append(command)
+
+class Output:
+    # Print Output in the terminal
+    # Customize color and style of
+    def __printOutput(self, text, color, newLine=False, style=''):
+        if text:
+            if newLine:
+                print(color + style + text + Color.clear)
+            else:
+                print(color + style + text + Color.clear, end='')
+        else:
+            print('-')
+
+    # Print a statement
+    def print(self, text, color='', style=''):
+        self.__printOutput(text, color, False, style)
+
+    # Print a statement and add a new Line
+    def printLn(self, text, color='', style=''):
+        self.__printOutput(text, color, True, style)
+
+    # Print an Empty Line
+    def emptyLn(self):
+        print(" ")
+
+    # Print a statement with a Process indicator
+    def process(self, text, color='', style=''):
+        self.__printOutput(Color.process + text, color, True, style)
+
+    # Print a statement with a Error indicator
+    def error(self, text, color='', style=''):
+        self.__printOutput(Color.error + text, color, True, style)
