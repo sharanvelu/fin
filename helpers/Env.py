@@ -18,6 +18,10 @@ class Env:
     def env(self, key, default=None):
         return os.getenv(self.getName(key), default)
 
+    # Get .env Variables from Bash Scripts
+    def pure(self, key, default=None):
+        return os.getenv(key, default)
+
     # SetEnv for docker compose files.
     # Equivalent to 'export' in 'bash'
     def setEnv(self, key, value):

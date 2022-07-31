@@ -1,6 +1,7 @@
 from helpers.Application import Application
 from helpers.Color import Color
 from helpers.Command import Command, Output
+from helpers.Database import Database
 from helpers.Docker import Asset, Docker, Proxy
 from helpers.Env import Env
 from helpers.System import System
@@ -13,6 +14,7 @@ class Container:
     env = Env()
     system = System()
     output = Output()
+    database = Database()
 
     def up(self, command):
         # Print Info From Server
@@ -22,16 +24,19 @@ class Container:
         self.env.checkEnvExistence(['SITE'])
 
         # Check pDocker Private network existence
-        self.docker.checkNetwork()
+        # self.docker.checkNetwork()
 
         # Check the status of the Asset Containers
         self.asset.checkAssetContainer()
 
+        # Check Project DB
+        self.__createProjectDB()
+
         # Start the Project container
-        self.__startProjectContainer()
+        # self.__startProjectContainer()
 
         # Setup Proxy
-        Proxy().setupProxy(self.__getContainerPort())
+        # Proxy().setupProxy(self.__getContainerPort())
 
     def down(self, command):
         if 'all' in command.getActions():
@@ -105,3 +110,9 @@ class Container:
         containerIds = self.docker.getContainerIds()
         if len(containerIds) > 0:
             self.__stopAllContainers(containerIds)
+
+    def __createProjectDB(self):
+        if self.env.env('SKIP_ASSET', None) is None and self.env.env('SKIP_DB_CHECK', None) is None:
+            self.database.createDB()
+        elif self.env.env('SKIP_DB_CHECK', None) == 1:
+            self.output.printLn(Color.cyan + self.env.getName('SKIP_DB_CHECK') + Color.clear + ' is provided. Skipping DB check...')
