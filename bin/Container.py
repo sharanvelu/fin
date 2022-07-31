@@ -24,7 +24,7 @@ class Container:
         self.env.checkEnvExistence(['SITE'])
 
         # Check pDocker Private network existence
-        # self.docker.checkNetwork()
+        self.docker.checkNetwork()
 
         # Check the status of the Asset Containers
         self.asset.checkAssetContainer()
@@ -33,10 +33,10 @@ class Container:
         self.__createProjectDB()
 
         # Start the Project container
-        # self.__startProjectContainer()
+        self.__startProjectContainer()
 
         # Setup Proxy
-        # Proxy().setupProxy(self.__getContainerPort())
+        Proxy().setupProxy(self.__getContainerPort())
 
     def down(self, command):
         if 'all' in command.getActions():
