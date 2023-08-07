@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+
+from system.Env import Env
+from system.docker.Container import Container
+
+from system.docker.Exec import Exec
+
+Env().loadEnv()
+
+exec = Exec()
+exec.run(containerName = 'e90d2522bef87625d96dc17f135ac3962feaf70fa8960a7c564d58b1108c9a75', command='php artisan tinker')
+
+raise SystemExit
+
+import importlib
+
+from system.App import App
+from system.Cli import Cli
+from system.Env import Env
+
+from system.docker.Asset import Asset
+
+from hooks.PrePlug import PrePlug
+from hooks.PostPlug import PostPlug
+
+app = App()
+env = Env()
+cli = Cli()
+
+# Load the ENV from .env file
+env.loadEnv()
+
+# Check the Env Existance.
+# If not, throw error and exit
+env.checkEnvExistence(['PLUG', 'HOST'])
+
+# Reserved Commands
+reservedCommands = []
+
+# Pre Plug Hooks
+PrePlug(app = app, env = env, cli = cli)
+
+# If the initated Command is not a reserved Command,
+# Invoke the Plug to proceed further
+if cli.getCommand() is not None and cli.getCommand() not in reservedCommands:
+    # Get the module and invoke the Plugin
+    plug = env.get('PLUG').lower().capitalize()
+    try :
+        # # # Import dynamic Classes
+        module = importlib.import_module('.' + plug, 'plugins.' + plug)
+        plugClass = getattr(module, 'Laravel')
+        try:
+            plugClass(env, cli)
+        except Exception as error:
+            cli.printLn('Something Went Wrong in ' + cli.color.cyan + plug + cli.color.clear + ' plug.')
+            cli.printLn('Error from the ' + cli.color.cyan + plug + cli.color.clear + ' plug :')
+            cli.error(error)
+            app.terminate()
+
+    except Exception as error:
+        cli.printLn('Plug ' + cli.color.cyan + plug + cli.color.clear + ' Not Found.')
+        app.terminate()
+
+# Pre Plug Hooks
+PostPlug(app = app, env = env, cli = cli)
+
+
+# Execute default Actions below
+# TODO : Need to add logics for common commands
+print('default action')
+
+
+# Finish the terminal session
+cli.printEmptyLn()
+raise SystemExit
+
+from datetime import datetime
+
+from system.docker.Asset import Asset
+from system.docker.Docker import Docker
+from system.docker.App import App
+
+docker = Docker()
+app = App()
+
+
+envs = {
+    "DATABASE_URL":"postgres://pghero:PassW0rDPgHero@hubble.ch130g7if4fr.ap-south-1.rds.amazonaws.com:5432/hubble_development",
+    "PGHERO_USERNAME":"user",
+    "PGHERO_PASSWORD":"password"
+}
+
+Asset().startProxy()
+app.run(host='pghero.localhost', name='pghero', image='ankane/pghero', envs=envs, containerPort=8080)
+
+## Table representation
+from system.Table import Table
+
+table = Table()
+table.setHeader(['Container ID', 'Container Name', 'Service', 'Site', 'Status', 'Time'])
+
+containers = docker.container.list(all=True, filters={"label":"com.example.vendor=dockr"})
+tableData = []
+for container in containers:
+    dateTime = datetime.fromisoformat(container.attrs['State']['StartedAt']).ctime()
+    table.addRow([
+        container.attrs['Config']['Hostname'],
+        container.attrs['Name'].strip('/'),
+        container.attrs['Config']['Labels']['com.example.service'],
+        'http://' + container.attrs['Config']['Labels']['com.example.host'],
+        container.attrs['State']['Status'].capitalize(),
+        dateTime # TODO : Need to change the Date time string to Current TimeZone
+    ])
+
+table.build()
+
+raise SystemExit
+
+
+
+
+
+
+# ------------------------------------------------------
+
+# from helpers.Docker import Asset
+# from helpers.Env import Env
+
+# print(Asset().canStartAsset('mysql'))
+
+from system.App import App
+from system.Env import Env
+
+app = App()
+
+env = Env()
+env.loadEnv()
+
+print(env.pure('DOCKR_SITE'))
+
+app.terminate()
+
+from docker.Docker import Docker
+
+docker = Docker()
+env = Env()
+
+docker.addVolume(env.env('PROJECT_ROOT_DIR'), "/var/www/html")\
+    .addPort(81, 80)\
+        .addEnv("DOCKR_COMPOSER_VERSION", "2")\
+            .addLabels("TYPE", "project")\
+                .addLabels("SERVICE", "web")\
+                    .setImage("sharanvelu/laravel-php:8.0")\
+                        .run()
+
+raise SystemExit
+
+
+# ------------------------------------------------------
+
+# Custom Import
+from helpers.Command import Command, Output
+from helpers.System import System
+
+command = Command()
+output = Output()
+system = System()
+
+if command.getCommand() in ["up", "down", "stop"]:
+    from bin.Container import Container
+
+    method = getattr(Container(), command.getCommand())
+    method(command)
+else:
+    output.printLn("Help")
+    output.printLn("None known command given...")
+
+system.terminate()
+
+# # # # Import dynamic Classes
+# nameSpace = __import__('plugins.Laravel')
+# module = getattr(nameSpace, 'Laravel')
+# pluginClass = getattr(module, 'Laravel')
+# method = getattr(pluginClass, 'image')
