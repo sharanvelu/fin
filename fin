@@ -3,15 +3,6 @@
 from system.Env import Env
 from system.docker.Container import Container
 
-from system.docker.Exec import Exec
-
-Env().loadEnv()
-
-exec = Exec()
-exec.run(containerName = 'e90d2522bef87625d96dc17f135ac3962feaf70fa8960a7c564d58b1108c9a75', command='php artisan tinker')
-
-raise SystemExit
-
 import importlib
 
 from system.App import App
