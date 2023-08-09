@@ -82,9 +82,9 @@ app = App()
 
 
 envs = {
-    "DATABASE_URL": "postgres://pghero:PassW0rDPgHero@hubble.ch130g7if4fr.ap-south-1.rds.amazonaws.com:5432/hubble_development",
-    "PGHERO_USERNAME": "user",
-    "PGHERO_PASSWORD": "password",
+    "DATABASE_URL": "",
+    "PGHERO_USERNAME": "",
+    "PGHERO_PASSWORD": "",
 }
 
 Asset().start_proxy()
