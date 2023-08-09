@@ -5,9 +5,10 @@ from system.Cli import Cli
 from system.docker.Asset import Asset
 from system.docker.Network import Network
 
+
 class PrePlug:
-    __availableCommands = [
-        'up'
+    __available_commands = [
+        "up",
     ]
 
     def __init__(self, app: App, env: Env, cli: Cli) -> None:
@@ -16,8 +17,8 @@ class PrePlug:
         self.__cli = cli
 
         # Check if the command is available
-        if cli.getCommand() in self.__availableCommands:
-            getattr(self, cli.getCommand())()
+        if cli.get_command() in self.__available_commands:
+            getattr(self, cli.get_command())()
 
     def up(self):
         # Create Application Network

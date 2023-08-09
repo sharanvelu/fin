@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 
-from system.Env import Env
-from system.docker.Container import Container
-
 import importlib
 
 from system.App import App
 from system.Cli import Cli
 from system.Env import Env
-
-from system.docker.Asset import Asset
 
 from hooks.PrePlug import PrePlug
 from hooks.PostPlug import PostPlug
@@ -19,50 +14,61 @@ env = Env()
 cli = Cli()
 
 # Load the ENV from .env file
-env.loadEnv()
+env.load_env()
 
-# Check the Env Existance.
+# Check the Env Existence.
 # If not, throw error and exit
-env.checkEnvExistence(['PLUG', 'HOST'])
+env.check_env_existence(["PLUG", "HOST"])
 
 # Reserved Commands
 reservedCommands = []
 
 # Pre Plug Hooks
-PrePlug(app = app, env = env, cli = cli)
+PrePlug(app=app, env=env, cli=cli)
 
-# If the initated Command is not a reserved Command,
+# If the initiated Command is not a reserved Command,
 # Invoke the Plug to proceed further
-if cli.getCommand() is not None and cli.getCommand() not in reservedCommands:
+if cli.get_command() is not None and cli.get_command() not in reservedCommands:
     # Get the module and invoke the Plugin
-    plug = env.get('PLUG').lower().capitalize()
-    try :
+    plug = env.get("PLUG").lower().capitalize()
+    try:
         # # # Import dynamic Classes
-        module = importlib.import_module('.' + plug, 'plugins.' + plug)
-        plugClass = getattr(module, 'Laravel')
+        module = importlib.import_module("." + plug, "plugins." + plug)
+        plugClass = getattr(module, "Laravel")
         try:
             plugClass(env, cli)
         except Exception as error:
-            cli.printLn('Something Went Wrong in ' + cli.color.cyan + plug + cli.color.clear + ' plug.')
-            cli.printLn('Error from the ' + cli.color.cyan + plug + cli.color.clear + ' plug :')
-            cli.error(error)
+            cli.print_ln(
+                "Something Went Wrong in "
+                + cli.color.cyan
+                + plug
+                + cli.color.clear
+                + " plug."
+            )
+            cli.print_ln(
+                "Error from the " + cli.color.cyan + plug + cli.color.clear + " plug :"
+            )
+            print(error)
             app.terminate()
 
+    except SystemExit as error:
+        app.terminate()
+
     except Exception as error:
-        cli.printLn('Plug ' + cli.color.cyan + plug + cli.color.clear + ' Not Found.')
+        cli.print_ln("Plug " + cli.color.cyan + plug + cli.color.clear + " Not Found.")
         app.terminate()
 
 # Pre Plug Hooks
-PostPlug(app = app, env = env, cli = cli)
+PostPlug(app=app, env=env, cli=cli)
 
 
 # Execute default Actions below
 # TODO : Need to add logics for common commands
-print('default action')
+print("default action")
 
 
 # Finish the terminal session
-cli.printEmptyLn()
+cli.print_empty_ln()
 raise SystemExit
 
 from datetime import datetime
@@ -76,40 +82,46 @@ app = App()
 
 
 envs = {
-    "DATABASE_URL":"postgres://pghero:PassW0rDPgHero@hubble.ch130g7if4fr.ap-south-1.rds.amazonaws.com:5432/hubble_development",
-    "PGHERO_USERNAME":"user",
-    "PGHERO_PASSWORD":"password"
+    "DATABASE_URL": "postgres://pghero:PassW0rDPgHero@hubble.ch130g7if4fr.ap-south-1.rds.amazonaws.com:5432/hubble_development",
+    "PGHERO_USERNAME": "user",
+    "PGHERO_PASSWORD": "password",
 }
 
-Asset().startProxy()
-app.run(host='pghero.localhost', name='pghero', image='ankane/pghero', envs=envs, containerPort=8080)
+Asset().start_proxy()
+app.run(
+    host="pghero.localhost",
+    name="pghero",
+    image="ankane/pghero",
+    envs=envs,
+    container_port=8080,
+)
 
 ## Table representation
 from system.Table import Table
 
 table = Table()
-table.setHeader(['Container ID', 'Container Name', 'Service', 'Site', 'Status', 'Time'])
+table.set_header(["Container ID", "Container Name", "Service", "Site", "Status", "Time"])
 
-containers = docker.container.list(all=True, filters={"label":"com.example.vendor=dockr"})
+containers = docker.container.list(
+    all=True, filters={"label": "com.example.vendor=dockr"}
+)
 tableData = []
 for container in containers:
-    dateTime = datetime.fromisoformat(container.attrs['State']['StartedAt']).ctime()
-    table.addRow([
-        container.attrs['Config']['Hostname'],
-        container.attrs['Name'].strip('/'),
-        container.attrs['Config']['Labels']['com.example.service'],
-        'http://' + container.attrs['Config']['Labels']['com.example.host'],
-        container.attrs['State']['Status'].capitalize(),
-        dateTime # TODO : Need to change the Date time string to Current TimeZone
-    ])
+    dateTime = datetime.fromisoformat(container.attrs["State"]["StartedAt"]).ctime()
+    table.add_row(
+        [
+            container.attrs["Config"]["Hostname"],
+            container.attrs["Name"].strip("/"),
+            container.attrs["Config"]["Labels"]["com.example.service"],
+            "http://" + container.attrs["Config"]["Labels"]["com.example.host"],
+            container.attrs["State"]["Status"].capitalize(),
+            dateTime,  # TODO : Need to change the Date time string to Current TimeZone
+        ]
+    )
 
 table.build()
 
 raise SystemExit
-
-
-
-
 
 
 # ------------------------------------------------------
@@ -125,9 +137,9 @@ from system.Env import Env
 app = App()
 
 env = Env()
-env.loadEnv()
+env.load_env()
 
-print(env.pure('DOCKR_SITE'))
+print(env.pure("DOCKR_SITE"))
 
 app.terminate()
 
@@ -136,13 +148,11 @@ from docker.Docker import Docker
 docker = Docker()
 env = Env()
 
-docker.addVolume(env.env('PROJECT_ROOT_DIR'), "/var/www/html")\
-    .addPort(81, 80)\
-        .addEnv("DOCKR_COMPOSER_VERSION", "2")\
-            .addLabels("TYPE", "project")\
-                .addLabels("SERVICE", "web")\
-                    .setImage("sharanvelu/laravel-php:8.0")\
-                        .run()
+docker.addVolume(env.env("PROJECT_ROOT_DIR"), "/var/www/html").addPort(81, 80).addEnv(
+    "DOCKR_COMPOSER_VERSION", "2"
+).addLabels("TYPE", "project").addLabels("SERVICE", "web").setImage(
+    "sharanvelu/laravel-php:8.0"
+).run()
 
 raise SystemExit
 
@@ -157,14 +167,14 @@ command = Command()
 output = Output()
 system = System()
 
-if command.getCommand() in ["up", "down", "stop"]:
+if command.get_command() in ["up", "down", "stop"]:
     from bin.Container import Container
 
-    method = getattr(Container(), command.getCommand())
+    method = getattr(Container(), command.get_command())
     method(command)
 else:
-    output.printLn("Help")
-    output.printLn("None known command given...")
+    output.print_ln("Help")
+    output.print_ln("None known command given...")
 
 system.terminate()
 
