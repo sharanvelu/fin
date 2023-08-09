@@ -1,5 +1,6 @@
-from .Docker import Docker
 from system.Cli import Cli
+
+from system.docker.Docker import Docker
 
 
 class Network(Docker):

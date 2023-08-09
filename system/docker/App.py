@@ -1,5 +1,6 @@
-from .Container import Container
 from system.App import App as Application
+
+from system.docker.Container import Container
 
 
 class App:

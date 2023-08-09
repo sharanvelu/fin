@@ -1,7 +1,7 @@
 import os
 
-from system.docker.Docker import Docker
 from system.docker.Container import Container as DockerContainer
+from system.docker.Docker import Docker
 
 
 class Exec:

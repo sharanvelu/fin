@@ -1,7 +1,7 @@
 import os
 
-from .App import App
-from .Cli import Cli
+from system.App import App
+from system.Cli import Cli
 
 
 class Env:
