@@ -8,6 +8,9 @@ class App:
     # Network
     network = name.lower() + '_network'
 
+    # Info URL to fetch information from Server
+    info_url = "https://fin.dockr.in/cli"
+
     def __init__(self) -> None:
         # Application Vars
         self.name_key = self.name.lower()
@@ -26,3 +29,7 @@ class App:
     # Terminate the application
     def terminate(self):
         raise SystemExit
+
+    # Terminate the application
+    def debug_mode(self):
+        return True

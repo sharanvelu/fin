@@ -31,9 +31,9 @@ class Output:
     def __print_output(self, text: str, color: str, new_line: bool = False, style: str = "") -> None:
         if text:
             if new_line:
-                print(color + style + text + Color.clear)
+                print(color + style + text + self.color.clear)
             else:
-                print(color + style + text + Color.clear, end="")
+                print(color + style + text + self.color.clear, end="")
         else:
             print("-")
 
@@ -51,15 +51,37 @@ class Output:
 
     # Print a statement with a Process indicator
     def process(self, text: str, color: str = "", style: str = "") -> None:
-        self.__print_output(Color.process + text, color, True, style)
+        self.__print_output(self.color.process + text, color, True, style)
 
     # Print a statement with a Error indicator
-    def error(self, text: str, color: str = "", style: str = "") -> None:
-        self.__print_output(Color.error + text, color, True, style)
+    def print_error(self, text: str, color: str = "", style: str = "") -> None:
+        self.__print_output(self.color.error + text, color, True, style)
 
     # Print a statement with a Error indicator
     def dd(self, text: str, color: str = "", style: str = "") -> None:
         self.__print_output(text, color, True, style)
+        App().terminate()
+
+    # Print a statement with a Error indicator
+    def error(self, context) -> None:
+        self.print_error("--------------- Error ---------------")
+        if App().debug_mode():
+            self.print_error('Message : ' + str(context))
+            self.print_empty_ln()
+            if isinstance(context, BaseException):
+                traceback = context.__traceback__
+                # Walk through the traceback and print information
+                while traceback is not None:
+                    self.print_error("----------------------")
+                    self.print_ln(f"File: {traceback.tb_frame.f_code.co_filename}")
+                    self.print_ln(f"Function: {traceback.tb_frame.f_code.co_name}")
+                    self.print_ln(f"Line: {traceback.tb_lineno}")
+                    traceback = traceback.tb_next
+            else:
+                print(context)
+        else:
+            self.__print_output(self.color.error + "Something went wrong", self.color.clear, True)
+
         App().terminate()
 
 

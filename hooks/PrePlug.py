@@ -11,10 +11,17 @@ class PrePlug:
         "up",
     ]
 
+    __info_check_commands = [
+        "up",
+    ]
+
     def __init__(self, app: App, env: Env, cli: Cli) -> None:
         self.__app = app
         self.__env = env
         self.__cli = cli
+
+        if cli.get_command() in self.__info_check_commands:
+            self.__check_info_from_server()
 
         # Check if the command is available
         if cli.get_command() in self.__available_commands:
@@ -26,3 +33,19 @@ class PrePlug:
 
         # Start the Asset Containers based on config and Overrides
         Asset().start()
+
+    def __check_info_from_server(self):
+        try:
+            import requests
+            response_from_server = requests.get(self.__app.info_url)
+
+            if response_from_server.status_code == 200:
+                self.__cli.print_ln("================================")
+                self.__cli.print_ln("Info From " + self.__app.name, self.__cli.color.cyan)
+                self.__cli.print_ln("++++++++++++++++++++++++++++++++")
+                self.__cli.print_ln(response_from_server.text)
+                self.__cli.print_ln("================================")
+                self.__cli.print_empty_ln()
+
+        except ImportError:
+            pass

@@ -25,7 +25,7 @@ class Exec:
                     print(output_bytes.decode())
 
                 else:
-                    os.system("docker exec -it " + container_name + " " + command)
+                    os.system(f"docker exec -it {container_name} {command}")
 
         except Exception as e:
             raise SystemExit

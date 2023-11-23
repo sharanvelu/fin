@@ -32,16 +32,12 @@ class App:
             # HTTP
             "traefik.http.routers." + host_key + ".rule": proxy_rule,
             "traefik.http.routers." + host_key + ".service": host_key + "_service",
-            "traefik.http.services."
-            + host_key
-            + "_service.loadbalancer.server.port": str(container_port),
+            "traefik.http.services." + host_key + "_service.loadbalancer.server.port": str(container_port),
             # HTTPS
             "traefik.http.routers." + secure_key + ".tls": "true",
             "traefik.http.routers." + secure_key + ".rule": proxy_rule,
             "traefik.http.routers." + secure_key + ".service": secure_key + "_service",
-            "traefik.http.services."
-            + secure_key
-            + "_service.loadbalancer.server.port": str(container_port),
+            "traefik.http.services." + secure_key + "_service.loadbalancer.server.port": str(container_port),
         }
 
     def __get_app_container_labels(self, host: str) -> dict:

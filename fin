@@ -5,6 +5,7 @@ import importlib
 from system.App import App
 from system.Cli import Cli
 from system.Env import Env
+from system.Reserved.Reserved import Reserved
 
 from hooks.PrePlug import PrePlug
 from hooks.PostPlug import PostPlug
@@ -21,45 +22,48 @@ env.load_env()
 env.check_env_existence(["PLUG", "HOST"])
 
 # Reserved Commands
-reservedCommands = []
+reservedCommands = [
+    # "asset",
+    # "config",
+    # "help",
+    # "info",
+    "ps",
+]
 
-# Pre Plug Hooks
-PrePlug(app=app, env=env, cli=cli)
+if cli.get_command() is not None:
+    # Pre Plug Hooks
+    PrePlug(app=app, env=env, cli=cli)
 
-# If the initiated Command is not a reserved Command,
-# Invoke the Plug to proceed further
-if cli.get_command() is not None and cli.get_command() not in reservedCommands:
-    # Get the module and invoke the Plugin
-    plug = env.get("PLUG").lower().capitalize()
-    try:
-        # # # Import dynamic Classes
-        module = importlib.import_module("." + plug, "plugins." + plug)
-        plugClass = getattr(module, "Laravel")
+    # If the initiated Command is not a reserved Command,
+    # Invoke the Plug to proceed further
+    if cli.get_command() not in reservedCommands:
+        # Get the module and invoke the Plugin
+        plug = env.get("PLUG").lower().capitalize()
         try:
-            plugClass(env, cli)
-        except Exception as error:
-            cli.print_ln(
-                "Something Went Wrong in "
-                + cli.color.cyan
-                + plug
-                + cli.color.clear
-                + " plug."
-            )
-            cli.print_ln(
-                "Error from the " + cli.color.cyan + plug + cli.color.clear + " plug :"
-            )
-            print(error)
+            # # # Import dynamic Classes
+            file = importlib.import_module(f".{plug}", f"plugins.{plug}")
+            plugClass = getattr(file, plug)
+            try:
+                plugClass(env, cli)
+            except Exception as error:
+                cli.error(error)
+
+        except SystemExit as error:
+            cli.error(error)
+
+        except ModuleNotFoundError as error:
+            cli.print_ln("Plug {}{}{} Not Found.".format(cli.color.cyan, plug, cli.color.clear))
             app.terminate()
 
-    except SystemExit as error:
-        app.terminate()
+        except Exception as exception:
+            cli.error(exception)
 
-    except Exception as error:
-        cli.print_ln("Plug " + cli.color.cyan + plug + cli.color.clear + " Not Found.")
-        app.terminate()
+    # If the command provided is a reserved Command
+    if cli.get_command() in reservedCommands:
+        Reserved(env=env, cli=cli)
 
-# Pre Plug Hooks
-PostPlug(app=app, env=env, cli=cli)
+    # Pre Plug Hooks
+    PostPlug(app=app, env=env, cli=cli)
 
 
 # Execute default Actions below

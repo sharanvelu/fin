@@ -33,9 +33,9 @@ class Container(Docker):
                     platform=platform,
                 )
         except RuntimeError as error:
-            print(error.args)
+            self.__cli.error(error.args)
         except Exception as exception:
-            print(exception)
+            self.__cli.error(exception)
             raise SystemExit
 
     # Get list of all Containers

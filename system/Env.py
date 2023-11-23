@@ -38,18 +38,12 @@ class Env:
         if len(missing_envs) > 0:
             self.cli.print("Required Env(s) ")
             self.cli.print(
-                self.cli.color.cyan
-                + (self.cli.color.clear + ", " + self.cli.color.cyan).join(missing_envs)
+                (self.cli.color.clear + ", " + self.cli.color.cyan).join(missing_envs),
+                self.cli.color.cyan,
             )
-            self.cli.print(" are" + self.cli.color.red + " missing ")
             self.cli.print_ln(
-                " from"
-                + self.cli.color.cyan
-                + " .env"
-                + self.cli.color.clear
-                + " file."
+                f" are {self.cli.color.red}missing{self.cli.color.clear} from {self.cli.color.cyan}.env{self.cli.color.clear} file."
             )
-
             self.app.terminate()
 
     def __load_system_env(self):
@@ -76,6 +70,6 @@ class Env:
             self.__load_system_env()
 
         else:
-            self.cli.error(".env file is missing from the project directory.")
-            self.cli.error("Make sure to run the command inside the Project directory.")
+            self.cli.print_error(".env file is missing from the project directory.")
+            self.cli.print_error("Make sure to run the command inside the Project directory.")
             self.app.terminate()

@@ -26,7 +26,7 @@ class Asset:
         return {
             "com.example.vendor": self.__app.name,
             "com.example.type": "asset",
-            "com.example.host": service.lower() + ".fin",
+            "com.example.host": service.lower() + "." + self.__app.name_key,
             "com.example.service": service.capitalize(),
         }
 
@@ -36,25 +36,19 @@ class Asset:
             if i.strip() == asset:
                 return True
 
-        return "True" == str(
-            self.__config.get(section=asset, option="start", default=False)
-        )
+        return "True" == str(self.__config.get(section=asset, option="start", default='False'))
 
     def start(self):
         self.start_proxy()
 
         if self.__env.get("SKIP_ASSET") == "skip":
             self.__cli.print_ln(
-                self.__env.get_name("SKIP_ASSET")
-                + self.__cli.color.clear
-                + " is Provided. Skipping Asset startup.",
+                "{}{} is Provided. Skipping Asset startup.".format(self.__env.get_name("SKIP_ASSET"), self.__cli.color.clear),
                 self.__cli.color.cyan,
             )
             if self.__env.get("OVERRIDE_ASSET") is not None:
                 self.__cli.print_ln(
-                    self.__env.get_name("OVERRIDE_ASSET")
-                    + self.__cli.color.clear
-                    + " is also Provided. This will be omitted.",
+                    "{}{} is also Provided. This will be ignored.".format(self.__env.get_name("OVERRIDE_ASSET"), self.__cli.color.clear),
                     self.__cli.color.cyan,
                 )
 
@@ -71,7 +65,7 @@ class Asset:
             name=self.__app.name_key + "_proxy",
             volumes=["/var/run/docker.sock:/var/run/docker.sock"],
             ports={80: 80, 8080: 8080, 443: 443},
-            labels={"com.example.site": "localhost"},
+            labels=self.__get_default_labels('proxy'),
         )
 
     def start_mysql(self):
@@ -129,15 +123,3 @@ class Asset:
                 ports={6379: 6379},
                 labels=self.__get_default_labels("redis"),
             )
-
-
-# # from system.App import App
-# from system.Config import Config
-
-# config = Config('assets')
-
-# print(config.set('assets', {'asd':'asd'}))
-# print(config.get('assets', 'mysql'))
-
-
-# raise SystemExit
