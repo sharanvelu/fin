@@ -24,7 +24,7 @@ env.check_env_existence(["PLUG", "HOST"])
 # Reserved Commands
 reservedCommands = [
     # "asset",
-    # "config",
+    "config",
     # "help",
     # "info",
     "ps",
@@ -68,11 +68,8 @@ if cli.get_command() is not None:
 
 # Execute default Actions below
 # TODO : Need to add logics for common commands
-print("default action")
-
-
+print("\n\n### default action")
 # Finish the terminal session
-cli.print_empty_ln()
 raise SystemExit
 
 from datetime import datetime

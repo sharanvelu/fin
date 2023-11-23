@@ -1,5 +1,4 @@
 import importlib
-import traceback
 
 from system.Cli import Cli
 from system.Env import Env
@@ -7,6 +6,7 @@ from system.Env import Env
 
 class Reserved:
     __available_commands = [
+        "config",
         "ps",
     ]
 

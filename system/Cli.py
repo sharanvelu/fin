@@ -77,8 +77,6 @@ class Output:
                     self.print_ln(f"Function: {traceback.tb_frame.f_code.co_name}")
                     self.print_ln(f"Line: {traceback.tb_lineno}")
                     traceback = traceback.tb_next
-            else:
-                print(context)
         else:
             self.__print_output(self.color.error + "Something went wrong", self.color.clear, True)
 
