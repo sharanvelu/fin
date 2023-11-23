@@ -16,7 +16,7 @@ class Env:
         return self.app.name.upper() + "_" + name
 
     # Get .env Variables from Bash Scripts
-    # Project ENV's are loaded within the Bash script and loaded here.
+    # Project ENVs are loaded within the Bash script and loaded here.
     def get(self, key: str, default: str = None):
         return os.getenv(self.get_name(key), default)
 

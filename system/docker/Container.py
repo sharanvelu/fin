@@ -7,18 +7,28 @@ from system.docker.Docker import Docker
 class Container(Docker):
     __cli = Cli()
 
-    STATUS_RUNNING = 'running'
-    STATUS_EXITED = 'exited'
+    STATUS_RUNNING = "running"
+    STATUS_EXITED = "exited"
 
     # Constructor
     def __init__(self) -> None:
         pass
 
     # Run Docker Container
-    def run(self, image: str, name: str, labels: dict = {}, volumes: list = [], command: (str or list) = None, ports: dict = {}, environment: dict = {}, platform: str = None) -> None:
+    def run(
+        self,
+        image: str,
+        name: str,
+        labels: dict = {},
+        volumes: list = [],
+        command: (str or list) = None,
+        ports: dict = {},
+        environment: dict = {},
+        platform: str = None,
+    ) -> None:
         try:
             if self.__can_start_container_with_name(name):
-                self.__cli.process('Starting container for ' + self.__cli.color.cyan + name)
+                self.__cli.process("Starting container for " + self.__cli.color.cyan + name)
 
                 self._client.containers.run(
                     image=image,
@@ -48,7 +58,7 @@ class Container(Docker):
 
     # Check for existence of a container with Same Name
     def __can_start_container_with_name(self, name: str) -> bool:
-        existing_container = self.list(all=True, filters={'name': name}, limit=1)
+        existing_container = self.list(all=True, filters={"name": name}, limit=1)
         if len(existing_container) == 0:
             return True
 

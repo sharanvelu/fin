@@ -1,5 +1,7 @@
 import os
 
+from system.Cli import Cli
+
 from system.docker.Container import Container as DockerContainer
 from system.docker.Docker import Docker
 
@@ -14,13 +16,9 @@ class Exec:
                 if use_api:
                     docker = Docker()
 
-                    exec_data = docker.client.api.exec_create(
-                        container=container_name, cmd=command, stdin=True, tty=True
-                    )
+                    exec_data = docker.client.api.exec_create(container=container_name, cmd=command, stdin=True, tty=True)
 
-                    output_bytes = docker.client.api.exec_start(
-                        exec_id=exec_data.get("Id"), tty=True
-                    )
+                    output_bytes = docker.client.api.exec_start(exec_id=exec_data.get("Id"), tty=True)
 
                     print(output_bytes.decode())
 
@@ -28,4 +26,4 @@ class Exec:
                     os.system(f"docker exec -it {container_name} {command}")
 
         except Exception as e:
-            raise SystemExit
+            Cli().error(e)

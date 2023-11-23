@@ -37,6 +37,7 @@ class PrePlug:
     def __check_info_from_server(self):
         try:
             import requests
+
             response_from_server = requests.get(self.__app.info_url)
 
             if response_from_server.status_code == 200:

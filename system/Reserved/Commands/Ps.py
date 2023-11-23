@@ -27,17 +27,14 @@ class Ps:
 
     def __build_asset_containers_list(self):
         table = Table(self.__table_headers)
-        table.build(self.__get_containers_data_from_container_type('asset'))
+        table.build(self.__get_containers_data_from_container_type("asset"))
 
     def __build_application_containers_list(self):
         table = Table(self.__table_headers)
-        table.build(self.__get_containers_data_from_container_type('application'))
+        table.build(self.__get_containers_data_from_container_type("application"))
 
     def __get_containers_data_from_container_type(self, container_type: str) -> list:
-        labels = [
-            "com.example.vendor=" + self.__env.app.name,
-            "com.example.type=" + container_type
-        ]
+        labels = ["com.example.vendor=" + self.__env.app.name, "com.example.type=" + container_type]
 
         list_of_containers = self.__container.list(all=True, filters={"label": labels})
 
@@ -54,5 +51,5 @@ class Ps:
             container.attrs["Config"]["Labels"]["com.example.service"],
             "https://" + container.attrs["Config"]["Labels"]["com.example.host"],
             container.attrs["State"]["Status"].capitalize(),
-            datetime.fromisoformat(container.attrs["State"]["StartedAt"]).ctime()
+            datetime.fromisoformat(container.attrs["State"]["StartedAt"]).ctime(),
         ]

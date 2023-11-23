@@ -53,20 +53,20 @@ class Output:
     def process(self, text: str, color: str = "", style: str = "") -> None:
         self.__print_output(self.color.process + text, color, True, style)
 
-    # Print a statement with a Error indicator
+    # Print a statement with an Error indicator
     def print_error(self, text: str, color: str = "", style: str = "") -> None:
         self.__print_output(self.color.error + text, color, True, style)
 
-    # Print a statement with a Error indicator
+    # Print a statement with an Error indicator
     def dd(self, text: str, color: str = "", style: str = "") -> None:
         self.__print_output(text, color, True, style)
         App().terminate()
 
-    # Print a statement with a Error indicator
+    # Print a statement with an Error indicator
     def error(self, context) -> None:
         self.print_error("--------------- Error ---------------")
         if App().debug_mode():
-            self.print_error('Message : ' + str(context))
+            self.print_error("Message : " + str(context))
             self.print_empty_ln()
             if isinstance(context, BaseException):
                 traceback = context.__traceback__
@@ -78,7 +78,7 @@ class Output:
                     self.print_ln(f"Line: {traceback.tb_lineno}")
                     traceback = traceback.tb_next
         else:
-            self.__print_output(self.color.error + "Something went wrong", self.color.clear, True)
+            self.print_error(f"{self.color.error}Something Went Wrong{self.color.clear}")
 
         App().terminate()
 
@@ -88,7 +88,7 @@ class Cli(Output):
         return self.args
 
     def get_command(self):
-        return self.all[0] if len(self.all) > 0 else None
+        return self.command
 
     def get_actions(self):
         return self.actions
@@ -111,10 +111,11 @@ class Cli(Output):
     def __init__(self):
         self.args = sys.argv
         self.all = sys.argv[1:]
-        self.options = {}
+        self.command = None
         self.actions = []
+        self.options = {}
         self.flags = []
-        for arg in self.all[1:]:
+        for arg in self.all:
             if arg.startswith("--"):
                 option_data = arg.replace("--", "").split("=")
                 option = option_data[0]
@@ -122,5 +123,7 @@ class Cli(Output):
                 self.options[option] = value
             elif arg.startswith("-"):
                 self.flags.append(arg.replace("-", ""))
+            elif arg == self.all[0]:
+                self.command = arg
             else:
                 self.actions.append(arg)

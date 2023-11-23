@@ -36,19 +36,23 @@ class Asset:
             if i.strip() == asset:
                 return True
 
-        return "True" == str(self.__config.get(section=asset, option="start", default='False'))
+        return "True" == str(self.__config.get(section=asset, option="start", default="False"))
 
     def start(self):
         self.start_proxy()
 
         if self.__env.get("SKIP_ASSET") == "skip":
             self.__cli.print_ln(
-                "{}{} is Provided. Skipping Asset startup.".format(self.__env.get_name("SKIP_ASSET"), self.__cli.color.clear),
+                "{}{} is Provided. Skipping Asset startup.".format(
+                    self.__env.get_name("SKIP_ASSET"), self.__cli.color.clear
+                ),
                 self.__cli.color.cyan,
             )
             if self.__env.get("OVERRIDE_ASSET") is not None:
                 self.__cli.print_ln(
-                    "{}{} is also Provided. This will be ignored.".format(self.__env.get_name("OVERRIDE_ASSET"), self.__cli.color.clear),
+                    "{}{} is also Provided. This will be ignored.".format(
+                        self.__env.get_name("OVERRIDE_ASSET"), self.__cli.color.clear
+                    ),
                     self.__cli.color.cyan,
                 )
 
@@ -65,7 +69,7 @@ class Asset:
             name=self.__app.name_key + "_proxy",
             volumes=["/var/run/docker.sock:/var/run/docker.sock"],
             ports={80: 80, 8080: 8080, 443: 443},
-            labels=self.__get_default_labels('proxy'),
+            labels=self.__get_default_labels("proxy"),
         )
 
     def start_mysql(self):

@@ -103,9 +103,7 @@ from system.Table import Table
 table = Table()
 table.set_header(["Container ID", "Container Name", "Service", "Site", "Status", "Time"])
 
-containers = docker.container.list(
-    all=True, filters={"label": "com.example.vendor=dockr"}
-)
+containers = docker.container.list(all=True, filters={"label": "com.example.vendor=dockr"})
 tableData = []
 for container in containers:
     dateTime = datetime.fromisoformat(container.attrs["State"]["StartedAt"]).ctime()
@@ -151,9 +149,7 @@ env = Env()
 
 docker.addVolume(env.env("PROJECT_ROOT_DIR"), "/var/www/html").addPort(81, 80).addEnv(
     "DOCKR_COMPOSER_VERSION", "2"
-).addLabels("TYPE", "project").addLabels("SERVICE", "web").setImage(
-    "sharanvelu/laravel-php:8.0"
-).run()
+).addLabels("TYPE", "project").addLabels("SERVICE", "web").setImage("sharanvelu/laravel-php:8.0").run()
 
 raise SystemExit
 

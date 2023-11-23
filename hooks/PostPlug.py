@@ -21,8 +21,4 @@ class PostPlug:
         # Create Database for Projects
         #
 
-        self.__cli.print_ln(
-            "Your Application should be running at "
-            + self.__cli.color.green
-            + self.__env.get("HOST")
-        )
+        self.__cli.print_ln("Your Application should be running at " + self.__cli.color.green + self.__env.get("HOST"))

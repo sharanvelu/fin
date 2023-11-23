@@ -69,10 +69,10 @@ class Config:
         table = Table()
         for i in asset_config_data:
             status = "Enabled" if asset_config_data.get(i).get("start") == "True" else "Disabled"
-            color = self.__cli.color.green if status == 'Enabled' else self.__cli.color.red
+            color = self.__cli.color.green if status == "Enabled" else self.__cli.color.red
             table.add_row([i, "=>", color + status + self.__cli.color.clear])
 
         self.__cli.print_empty_ln()
         self.__cli.print_ln("Asset Configurations")
         self.__cli.print_empty_ln()
-        table.build(table_format='plain')
+        table.build(table_format="plain")

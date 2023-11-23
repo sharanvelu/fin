@@ -13,9 +13,7 @@ class Volume(Docker):
         return self._app.name_key + "_" + name
 
     def get(self, name: str):
-        volumes = self._client.volumes.list(
-            filters={"name": self.get_volume_name(name)}
-        )
+        volumes = self._client.volumes.list(filters={"name": self.get_volume_name(name)})
 
         return volumes[0] if len(volumes) > 0 else None
 

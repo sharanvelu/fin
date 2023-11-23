@@ -54,7 +54,16 @@ class App:
 
         return labels
 
-    def run(self, host: str, image: str, labels: dict = {}, envs: dict = {}, container_port: int = 80, volumes: list = [], ports: dict = {}) -> None:
+    def run(
+        self,
+        host: str,
+        image: str,
+        labels: dict = {},
+        envs: dict = {},
+        container_port: int = 80,
+        volumes: list = [],
+        ports: dict = {},
+    ) -> None:
         self.__container.run(
             image=image,
             name=self.__app.get_container_name(host),
