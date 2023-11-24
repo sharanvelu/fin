@@ -21,22 +21,13 @@ env.load_env()
 # If not, throw error and exit
 env.check_env_existence(["PLUG", "HOST"])
 
-# Reserved Commands
-reservedCommands = [
-    # "asset",
-    "config",
-    # "help",
-    # "info",
-    "ps",
-]
-
 if cli.get_command() is not None:
     # Pre Plug Hooks
     PrePlug(app=app, env=env, cli=cli)
 
     # If the initiated Command is not a reserved Command,
     # Invoke the Plug to proceed further
-    if cli.get_command() not in reservedCommands:
+    if cli.get_command() not in Reserved.available_commands:
         # Get the module and invoke the Plugin
         plug = env.get("PLUG").lower().capitalize()
         try:
@@ -59,7 +50,7 @@ if cli.get_command() is not None:
             cli.error(exception)
 
     # If the command provided is a reserved Command
-    if cli.get_command() in reservedCommands:
+    if cli.get_command() in Reserved.available_commands:
         Reserved(env=env, cli=cli)
 
     # Pre Plug Hooks

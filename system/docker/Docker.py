@@ -18,7 +18,7 @@ class Docker:
     try:
         _client: DockerClient = docker.from_env()
     except Exception as e:
-        print("Docker not running...")
+        print("Docker is not running...")
         raise SystemExit
 
     @property
