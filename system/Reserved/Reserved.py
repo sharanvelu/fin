@@ -5,25 +5,13 @@ from system.Env import Env
 
 
 class Reserved:
-    available_commands = [
-        "bash",
-        "config",
-        "ps",
-        "sh",
-        "status",
-        "shell",
-    ]
-
     def __init__(self, env: Env, cli: Cli) -> None:
         self.__env = env
         self.__cli = cli
 
         command = self.__cli.get_command().lower()
 
-        if command in self.available_commands:
-            self.__invoke(command)
-        else:
-            self.__cli.print_error("Unknown command " + command)
+        self.__invoke(command)
 
     def __invoke(self, command: str):
         command = self.__proxy_command(command)

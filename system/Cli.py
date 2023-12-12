@@ -63,7 +63,7 @@ class Output:
         App().terminate()
 
     # Print a statement with an Error indicator
-    def error(self, context) -> None:
+    def error(self, context, error_message = None) -> None:
         self.print_error("--------------- Error ---------------")
         if App().debug_mode():
             self.print_error("Message : " + str(context))
@@ -77,8 +77,10 @@ class Output:
                     self.print_ln(f"Function: {traceback.tb_frame.f_code.co_name}")
                     self.print_ln(f"Line: {traceback.tb_lineno}")
                     traceback = traceback.tb_next
-        else:
+        elif error_message is None:
             self.print_error(f"{self.color.error}Something Went Wrong{self.color.clear}")
+        else:
+            self.print_ln(error_message)
 
         App().terminate()
 
@@ -86,6 +88,9 @@ class Output:
 class Cli(Output):
     def get_args(self):
         return self.args
+
+    def get_all(self):
+        return self.all
 
     def get_command(self):
         return self.command

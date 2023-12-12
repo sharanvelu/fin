@@ -23,7 +23,7 @@ class App:
         # Filters the hosts part without wildcard (*) and localhost
         hosts = [a for a in host.split(".") if (a != "localhost" and "*" not in list(a))]
         # Return the remaining host part combined by underscore (_)
-        return "_".join(hosts)
+        return "_".join(hosts).replace("-", "_")
 
     # Get Container Name from Host
     def get_container_name(self, host) -> str:
