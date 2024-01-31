@@ -20,8 +20,9 @@ class PrePlug:
         self.__env = env
         self.__cli = cli
 
-        if cli.get_command() in self.__info_check_commands:
-            self.__check_info_from_server()
+        # TODO : Uncomment the following lines when done with working on the info response server.
+        # if cli.get_command() in self.__info_check_commands:
+        #     self.__check_info_from_server()
 
         # Check if the command is available
         if cli.get_command() in self.__available_commands:
@@ -48,5 +49,6 @@ class PrePlug:
                 self.__cli.print_ln("================================")
                 self.__cli.print_empty_ln()
 
-        except ImportError:
+        except Exception as exception:
+            self.__cli.error(exception)
             pass

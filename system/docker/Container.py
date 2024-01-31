@@ -58,14 +58,19 @@ class Container(Docker):
 
     # Check for existence of a container with Same Name
     def __can_start_container_with_name(self, name: str) -> bool:
-        existing_container = self.list(all=True, filters={"name": name}, limit=1)
-        if len(existing_container) == 0:
+        existing_containers = self.list(all=True, filters={"name": name})
+        if len(existing_containers) == 0:
             return True
 
-        if existing_container[0].status != self.STATUS_RUNNING:
-            existing_container[0].start()
+        for container in existing_containers:
+            if container.name == name:
+                if container.status != self.STATUS_RUNNING:
+                    self.__cli.process("Starting Container " + self.__cli.color.cyan + name)
+                    container.start()
 
-        return False
+                return False
+
+        return True
 
     def exec(self, command: str = None) -> None:
         if command is not None:

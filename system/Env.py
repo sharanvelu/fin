@@ -8,6 +8,10 @@ class Env:
     app = App()
     cli = Cli()
 
+    def __init__(self):
+        # Load the ENV from .env file
+        self.load_env()
+
     # Get Name of the ENV variable.
     def get_name(self, name: str) -> str:
         if name.startswith(self.app.name.upper() + "_"):

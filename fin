@@ -15,9 +15,6 @@ if cli.get_command() is not None:
     env = Env()
     command = Command(env, cli)
 
-    # Load the ENV from .env file
-    env.load_env()
-
     # If the command is not a Global Command
     if not command.is_global:
         # Check the Env Existence.
