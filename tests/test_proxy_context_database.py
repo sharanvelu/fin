@@ -148,3 +148,56 @@ def test_ensure_mysql_database_container_missing(monkeypatch):
     monkeypatch.setattr(db, "find_container", lambda name: (_ for _ in ()).throw(Exception("no container")))
     # Should warn and return without raising.
     db._ensure_mysql_database("mydb")
+
+
+def _exec_result(exit_code, output=b""):
+    """Build the .exit_code/.output object the database code reads."""
+    return type("R", (), {"exit_code": exit_code, "output": output})()
+
+
+def test_ensure_postgres_database_creates_when_absent(monkeypatch):
+    c = make_fake_container(name="fin_postgres", status="running")
+    # 1st exec_run = pg_database existence probe (empty -> does NOT exist),
+    # 2nd exec_run = CREATE DATABASE.
+    c.exec_run.side_effect = [
+        _exec_result(0, b""),   # existence check returns no rows
+        _exec_result(0, b""),   # create succeeds
+    ]
+    monkeypatch.setattr(db, "find_container", lambda name: c)
+    monkeypatch.setattr(db, "wait_for_ready", lambda container, **kw: True)
+
+    db._ensure_postgres_database("pgdb")
+
+    assert c.exec_run.call_count == 2
+    create_args, _ = c.exec_run.call_args  # last call = CREATE
+    argv = create_args[0]
+    assert argv[0] == "psql"
+    assert argv[:2] != ["sh", "-c"]  # not shell-wrapped
+    assert any("CREATE DATABASE" in part for part in argv)
+    assert any("pgdb" in part for part in argv)
+
+
+def test_ensure_postgres_database_skips_when_exists(monkeypatch):
+    c = make_fake_container(name="fin_postgres", status="running")
+    # existence probe returns a "1" row -> database already exists.
+    c.exec_run.return_value = _exec_result(0, b"1\n")
+    monkeypatch.setattr(db, "find_container", lambda name: c)
+    monkeypatch.setattr(db, "wait_for_ready", lambda container, **kw: True)
+
+    db._ensure_postgres_database("pgdb")
+
+    # Only the existence check ran; no CREATE DATABASE exec.
+    c.exec_run.assert_called_once()
+    argv = c.exec_run.call_args[0][0]
+    assert not any("CREATE DATABASE" in part for part in argv)
+
+
+def test_ensure_postgres_database_skips_when_not_ready(monkeypatch):
+    c = make_fake_container(name="fin_postgres", status="running")
+    monkeypatch.setattr(db, "find_container", lambda name: c)
+    monkeypatch.setattr(db, "wait_for_ready", lambda container, **kw: False)
+
+    db._ensure_postgres_database("pgdb")
+
+    # Readiness never succeeded -> no exec_run at all.
+    c.exec_run.assert_not_called()

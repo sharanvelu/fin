@@ -9,7 +9,7 @@
 #   1. Verifies prerequisites (git, a Python 3.11+ interpreter).
 #   2. Clones (or updates) the Fin repo into ${FIN_HOME_DIR:-$HOME/.fin-cli}.
 #   3. Symlinks the `fin` launcher into the first writable PATH directory
-#      (/usr/local/bin, ~/bin, ~/.bin, ~/.local/bin ...).
+#      (/usr/local/bin, ~/.local/bin, ~/bin, ~/.bin ...).
 #   4. Installs Python dependencies (typer, rich, docker) for the user.
 #
 # Configurable via environment variables:

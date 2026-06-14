@@ -172,7 +172,7 @@ delegated to a plug.
 | Command | Description |
 | ------- | ----------- |
 | `fin ps` (aliases `status`, `containers`) | List running Fin containers. `-a`/`--all` includes stopped ones. |
-| `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. |
+| `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. When run from a real terminal, interactive sessions like `fin exec sh` / `fin exec bash` attach stdin so they behave like a normal shell (`exit`/Ctrl-D ends them); piped/non-interactive use streams output. |
 | `fin inspect [name]` | Rich JSON inspect of a container (default: the project's primary). |
 | `fin logs [name] [--follow/-f] [--tail N] [--since X]` | Tail logs (default: the project's primary). |
 
@@ -202,12 +202,12 @@ Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):
 | ------- | ----------- |
 | `fin artisan ...` (alias `art`) | Run an `artisan` command. |
 | `fin composer ...` | Run `composer` in the container. |
-| `fin tinker` | Open a Laravel tinker session. |
+| `fin tinker` | Open an interactive Laravel tinker session (stdin attached; `exit`/Ctrl-D ends it). |
 | `fin migrate [fresh\|rollback\|refresh] ...` | Run migrations. |
 | `fin seed [class]` | Run database seeders. |
 | `fin make <type> <name> ...` | Run `artisan make:<type>`. |
 | `fin queue [work\|listen\|restart] ...` | Run the queue (default `listen`). |
-| `fin bash` (alias `shell`) | Open a shell in the container. |
+| `fin bash` (alias `shell`) | Open an interactive shell in the container (stdin attached; `exit`/Ctrl-D ends it). |
 | `fin phpunit ...` | Run `./vendor/bin/phpunit`. |
 | `fin bin <command> ...` | Run `./vendor/bin/<command>`. |
 | `fin php ...` | Run the `php` binary. |
@@ -242,7 +242,7 @@ Process environment variables take precedence over the `.env` file, so
 | `FIN_PLUGS` | Comma-separated list of auxiliary plugs to consider/start (e.g. `mysql,redis`). |
 | `FIN_SITE` | The host the app is routed at (e.g. `myapp.localhost`). Drives Traefik routing. |
 | `FIN_CONTAINER_NAME` | Override the project name (defaults to the cwd basename, lowercased). |
-| `FIN_DOCKER_IMAGE` | Override the primary container image. |
+| `FIN_DOCKER_IMAGE` | Override the primary container image. *(Laravel)* defaults to `sharanvelu/laravel-php:<FIN_PHP_VERSION>`. |
 | `FIN_OVERRIDE_ASSETS` | Comma-separated assets to start, overriding the persisted enable flags. |
 | `FIN_PHP_VERSION` | *(Laravel)* PHP/image tag, e.g. `8.3`, `8.2`, `latest`. Default `latest`. |
 | `FIN_COMPOSER_VERSION` | *(Laravel)* Composer major version, `1` or `2`. Default `2`. |
@@ -266,6 +266,9 @@ Process environment variables take precedence over the `.env` file, so
 | `DOCKER_HOST` | If set, Fin defers to the Docker SDK's own socket handling. | unset |
 
 ## How it works
+
+> For the full architecture, see **[ARCHITECTURE.md](ARCHITECTURE.md)** (orientation)
+> and **[DESIGN.md](DESIGN.md)** (deep dive).
 
 ### The proxy
 

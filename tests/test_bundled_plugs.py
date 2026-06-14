@@ -72,36 +72,67 @@ def test_laravel_commands(bundled_plugs):
     assert "art" in cmds["artisan"].aliases
 
 
+class FakeCtx:
+    """Records the args/kwargs a plug command handler passes to ctx.exec().
+
+    Mirrors the real PlugContext.exec signature, including the ``interactive``
+    kwarg used by REPL/shell handlers (tinker, bash).
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def exec(self, cmd, *, workdir=None, interactive=False):
+        self.calls.append({"cmd": cmd, "workdir": workdir, "interactive": interactive})
+        return 0
+
+
 def test_laravel_artisan_handler_delegates(bundled_plugs, tmp_path):
     lp = load_by_name("laravel")
     cmds = lp.instance.commands()
 
-    calls = {}
-
-    class FakeCtx:
-        def exec(self, cmd, *, workdir=None):
-            calls["cmd"] = cmd
-            calls["workdir"] = workdir
-            return 0
-
-    rc = cmds["artisan"].handler(FakeCtx(), ["migrate", "--seed"])
+    ctx = FakeCtx()
+    rc = cmds["artisan"].handler(ctx, ["migrate", "--seed"])
     assert rc == 0
-    assert calls["cmd"] == ["php", "artisan", "migrate", "--seed"]
-    assert calls["workdir"] == "/var/www/html"
+    assert ctx.calls[0]["cmd"] == ["php", "artisan", "migrate", "--seed"]
+    assert ctx.calls[0]["workdir"] == "/var/www/html"
 
 
 def test_laravel_migrate_subcommands(bundled_plugs, tmp_path):
     lp = load_by_name("laravel")
     cmds = lp.instance.commands()
-    captured = {}
 
-    class FakeCtx:
-        def exec(self, cmd, *, workdir=None):
-            captured["cmd"] = cmd
-            return 0
+    ctx = FakeCtx()
+    cmds["migrate"].handler(ctx, ["fresh"])
+    assert ctx.calls[0]["cmd"] == ["php", "artisan", "migrate:fresh"]
 
-    cmds["migrate"].handler(FakeCtx(), ["fresh"])
-    assert captured["cmd"] == ["php", "artisan", "migrate:fresh"]
+
+# --------------------------------------------------------------------------- #
+# Interactive contract: REPL/shell handlers attach stdin; one-shots do not.
+# --------------------------------------------------------------------------- #
+def test_laravel_tinker_is_interactive(bundled_plugs):
+    lp = load_by_name("laravel")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds["tinker"].handler(ctx, [])
+    assert ctx.calls[0]["interactive"] is True
+
+
+def test_laravel_bash_is_interactive(bundled_plugs):
+    lp = load_by_name("laravel")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds["bash"].handler(ctx, [])
+    assert ctx.calls[0]["interactive"] is True
+
+
+@pytest.mark.parametrize("name,args", [("artisan", ["list"]), ("migrate", [])])
+def test_laravel_oneshot_handlers_not_interactive(bundled_plugs, name, args):
+    lp = load_by_name("laravel")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds[name].handler(ctx, args)
+    assert ctx.calls[0]["interactive"] is False
 
 
 @pytest.mark.parametrize(
@@ -121,6 +152,24 @@ def test_asset_plugs(bundled_plugs, tmp_path, plug_name, expected_image, contain
     spec = specs[0]
     assert spec.image == expected_image
     assert spec.container_name == container_name
+
+
+@pytest.mark.parametrize(
+    "plug_name,container_name,image",
+    [
+        ("postgres", "fin_postgres", "postgres:16-alpine"),
+        ("redis", "fin_redis", "redis:7-alpine"),
+    ],
+)
+def test_asset_spec_has_ports_and_volumes(
+    bundled_plugs, tmp_path, plug_name, container_name, image
+):
+    lp = load_by_name(plug_name)
+    spec = lp.instance.asset_specs(_env(tmp_path))[0]
+    assert spec.container_name == container_name
+    assert spec.image == image
+    assert spec.ports  # at least one published port
+    assert spec.volumes  # at least one persistent volume
 
 
 def test_mysql_uses_config_credentials(bundled_plugs, tmp_path, monkeypatch):

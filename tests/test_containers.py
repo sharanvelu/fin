@@ -245,3 +245,79 @@ def test_run_container_merges_extra(patch_docker):
     run_container(image="x", name="n", labels={}, extra={"privileged": True})
     _, kwargs = patch_docker.containers.run.call_args
     assert kwargs["privileged"] is True
+
+
+# --------------------------------------------------------------------------- #
+# run_container — failed-run cleanup + friendly errors
+# --------------------------------------------------------------------------- #
+def test_run_container_port_in_use_cleans_up_and_raises(patch_docker):
+    from fincli.core.errors import FinError
+
+    # No container exists when run_container first checks; the cleanup pass then
+    # finds the half-created leftover and must force-remove it.
+    leftover = make_fake_container(name="demo-web")
+    patch_docker.containers.list.side_effect = [
+        [],          # initial existence check -> nothing
+        [leftover],  # _cleanup_failed lookup -> leftover to remove
+    ]
+    patch_docker.networks.list.return_value = [object()]
+    patch_docker.containers.run.side_effect = Exception(
+        "driver failed programming external connectivity: "
+        "Bind for 0.0.0.0:80 failed: port is already allocated"
+    )
+
+    with pytest.raises(FinError) as excinfo:
+        run_container(
+            image="demo:latest",
+            name="demo-web",
+            labels={},
+            ports={"80/tcp": 80},
+        )
+
+    assert excinfo.value.title == "Port In Use"
+    leftover.remove.assert_called_once_with(force=True)
+
+
+def test_run_container_address_in_use_is_port_in_use(patch_docker):
+    from fincli.core.errors import FinError
+
+    patch_docker.containers.list.side_effect = [[], []]
+    patch_docker.networks.list.return_value = [object()]
+    patch_docker.containers.run.side_effect = Exception("address already in use")
+
+    with pytest.raises(FinError) as excinfo:
+        run_container(image="x", name="demo-web", labels={}, ports={"80/tcp": 80})
+    assert excinfo.value.title == "Port In Use"
+
+
+def test_run_container_generic_error_is_start_failed(patch_docker):
+    from fincli.core.errors import FinError
+
+    patch_docker.containers.list.side_effect = [[], []]
+    patch_docker.networks.list.return_value = [object()]
+    patch_docker.containers.run.side_effect = Exception("image not found: boom")
+
+    with pytest.raises(FinError) as excinfo:
+        run_container(image="ghost:latest", name="demo-web", labels={})
+    assert excinfo.value.title == "Container Start Failed"
+
+
+def test_run_container_cleanup_swallows_errors(patch_docker):
+    # If the cleanup lookup itself raises, the original friendly error must
+    # still surface (cleanup is best-effort and never masks the real failure).
+    from fincli.core.errors import FinError
+
+    def list_side_effect(*args, **kwargs):
+        if list_side_effect.calls == 0:
+            list_side_effect.calls += 1
+            return []  # initial existence check
+        raise Exception("docker list exploded during cleanup")
+
+    list_side_effect.calls = 0
+    patch_docker.containers.list.side_effect = list_side_effect
+    patch_docker.networks.list.return_value = [object()]
+    patch_docker.containers.run.side_effect = Exception("port is already allocated")
+
+    with pytest.raises(FinError) as excinfo:
+        run_container(image="x", name="demo-web", labels={}, ports={"80/tcp": 80})
+    assert excinfo.value.title == "Port In Use"

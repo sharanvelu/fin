@@ -112,7 +112,12 @@ place that mutates the Docker daemon.
   `setup()`, and degrades gracefully on failure.
 - **`registry.py`** — the SQLite cache + the `fin plugs` operations.
 - **`context.py`** — `PlugContext`, the execution context handed to plug command
-  handlers; exposes `exec(...)` to run inside the primary container.
+  handlers; exposes `exec(...)` to run inside the primary container. Pass
+  `interactive=True` for commands that open a session the user types into
+  (`bash`, `tinker`, REPLs); this delegates to **`core/interactive.py`**, which
+  attaches the local stdin to a container TTY and proxies both directions until
+  the shell exits (so `exit`/Ctrl-D ends it cleanly), falling back to streamed
+  output when there is no local TTY. One-shot commands leave it `False`.
 
 ### Commands (`fincli/commands`)
 

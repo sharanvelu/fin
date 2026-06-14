@@ -35,10 +35,12 @@ fin up                                            # in a project dir with a FIN_
 
 ## More detail
 
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — orientation map: layered design,
+  component responsibilities, request flow, and key invariants.
 - **[AGENTS.md](AGENTS.md)** — project layout, conventions, how to add a command
   vs a plug, the env-spec pattern, test fixtures, and gotchas.
-- **[DESIGN.md](DESIGN.md)** — layer diagram, the declarative-plug principle, the
-  `fin up` orchestrator flow, label/Traefik schema, registry rationale, and the
-  error/exit-code contract.
+- **[DESIGN.md](DESIGN.md)** — the deep dive: layer diagram, the declarative-plug
+  principle, the `fin up` orchestrator flow, label/Traefik schema, registry
+  rationale, and the error/exit-code contract.
 - **[README.md](README.md)** — install, quickstart, full command/env reference,
   and the plugin authoring guide.
