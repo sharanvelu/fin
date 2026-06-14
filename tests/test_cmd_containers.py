@@ -104,22 +104,33 @@ def test_exec_not_running(monkeypatch, tmp_path):
 
 
 def test_exec_runs_and_returns_code(monkeypatch, tmp_path):
+    # `fin exec` delegates to interactive_exec (which proxies stdin for shells
+    # and streams otherwise) and returns its exit code.
     c = make_fake_container(name="demo-web", status="running")
-    c.exec_run.return_value = (3, iter([b"output"]))
     monkeypatch.setattr(cc.ProjectEnv, "load", classmethod(lambda cls: _env(tmp_path)))
     monkeypatch.setattr(cc, "find_primary", lambda project: c)
+
+    captured = {}
+    import fincli.core.interactive as inter
+
+    def fake_interactive(container, cmd, **kwargs):
+        captured["cmd"] = cmd
+        return 3
+
+    monkeypatch.setattr(inter, "interactive_exec", fake_interactive)
     rc = cc.exec_cmd(["ls", "-la"])
     assert rc == 3
-    c.exec_run.assert_called_once()
-    args, kwargs = c.exec_run.call_args
-    assert args[0] == ["ls", "-la"]
+    assert captured["cmd"] == ["ls", "-la"]
 
 
-def test_exec_handles_none_output(monkeypatch, tmp_path):
+def test_exec_handles_zero_code(monkeypatch, tmp_path):
     c = make_fake_container(name="demo-web", status="running")
-    c.exec_run.return_value = (0, None)
     monkeypatch.setattr(cc.ProjectEnv, "load", classmethod(lambda cls: _env(tmp_path)))
     monkeypatch.setattr(cc, "find_primary", lambda project: c)
+
+    import fincli.core.interactive as inter
+
+    monkeypatch.setattr(inter, "interactive_exec", lambda container, cmd, **kw: 0)
     assert cc.exec_cmd(["true"]) == 0
 
 

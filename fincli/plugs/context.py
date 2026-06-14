@@ -36,12 +36,21 @@ class PlugContext:
         return primary_container_name(self.project, self.service)
 
     def exec(self, cmd: list[str] | str, *, workdir: str | None = None,
-             tty: bool = True, stream: bool = True) -> int:
+             interactive: bool = False) -> int:
         """Exec *cmd* inside the project's primary container.
 
-        Streams output to the terminal via the UI console and returns the
-        command's exit code. Raises :class:`fincli.core.errors.NotFound` (with a
-        friendly message) if the container is not running.
+        Returns the command's exit code. Warns and returns 1 if the container
+        is not running.
+
+        Set ``interactive=True`` for commands that open a session the user
+        types into (``bash``, ``sh``, ``tinker``, REPLs). That attaches the
+        local stdin to a container TTY and proxies both directions, so typing
+        ``exit`` (or Ctrl-D) ends the session and returns control to the shell.
+        Without it, an interactive program would hang waiting for input it can
+        never receive.
+
+        For one-shot commands (``artisan migrate``, ``composer install``) leave
+        ``interactive=False`` — output is streamed to the terminal.
         """
         from fincli.ui.console import console, warning
 
@@ -50,24 +59,21 @@ class PlugContext:
             warning(f"Container '{self.primary_name}' is not running. Run 'fin up' first.")
             return 1
 
-        exec_kwargs: dict = {"tty": tty, "stream": stream, "demux": False}
+        if interactive:
+            from fincli.core.interactive import interactive_exec
+
+            return interactive_exec(container, cmd, workdir=workdir)
+
+        # One-shot: stream output, no stdin attached.
+        exec_kwargs: dict = {"tty": False, "stream": True, "demux": False}
         if workdir:
             exec_kwargs["workdir"] = workdir
-
-        if stream:
-            exit_code_holder = container.exec_run(cmd, **exec_kwargs)
-            # docker-py returns (exit_code, output_generator) when stream=True
-            code, output = exit_code_holder
-            if output is not None:
-                for chunk in output:
-                    console.file.write(chunk.decode("utf-8", errors="replace"))
-                    console.file.flush()
-            # When streaming, exit code may be None until drained; re-inspect.
-            if code is None:
-                code = 0
-            return int(code)
-        result = container.exec_run(cmd, **exec_kwargs)
-        if result.output:
-            console.file.write(result.output.decode("utf-8", errors="replace"))
-            console.file.flush()
-        return int(result.exit_code or 0)
+        code, output = container.exec_run(cmd, **exec_kwargs)
+        if output is not None:
+            for chunk in output:
+                console.file.write(chunk.decode("utf-8", errors="replace"))
+                console.file.flush()
+        # When streaming, the exit code may be None until drained.
+        if code is None:
+            code = 0
+        return int(code)

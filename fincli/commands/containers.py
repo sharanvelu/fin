@@ -92,12 +92,12 @@ def exec_cmd(args: list[str]) -> int:
     if container.status != "running":
         error(f"'{container.name}' is not running. Run 'fin up' first.", title="Not Running")
         return EXIT_USER
-    code, output = container.exec_run(args, tty=True, stream=True)
-    if output is not None:
-        for chunk in output:
-            console.file.write(chunk.decode("utf-8", errors="replace"))
-            console.file.flush()
-    return int(code or 0)
+    # Run through the interactive helper: when fin is attached to a real TTY it
+    # gives commands like `fin exec sh` / `fin exec bash` a proper session
+    # (stdin attached, `exit` works); otherwise it transparently streams output.
+    from fincli.core.interactive import interactive_exec
+
+    return interactive_exec(container, args)
 
 
 @reserved(
