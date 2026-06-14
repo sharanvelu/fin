@@ -2,6 +2,9 @@
 # Kept out of version control per project spec.
 /plugs/
 
+# Documentation website — lives in its own repo.
+/docs-site/
+
 # Python
 __pycache__/
 *.py[cod]
