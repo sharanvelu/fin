@@ -14,7 +14,7 @@ from fincli.commands import reserved
 from fincli.core.containers import find_container, find_primary, list_containers
 from fincli.core.env import ProjectEnv
 from fincli.ui.console import console, error, info
-from fincli.ui.tables import make_container_table
+from fincli.ui.tables import render_grouped_containers
 
 
 def _read_stats(containers) -> dict[str, dict[str, str]]:
@@ -61,6 +61,9 @@ def _mem_usage(s: dict) -> str:
     help="List running Fin containers (-a for all).",
     aliases=("status", "containers"),
     group="Containers",
+    usage="fin ps [-a]",
+    options=(("-a, --all", "Include stopped containers, not just running ones."),),
+    examples=("fin ps", "fin ps -a"),
 )
 def ps(args: list[str]) -> int:
     show_all = "-a" in args or "--all" in args
@@ -69,12 +72,17 @@ def ps(args: list[str]) -> int:
         info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
         return EXIT_OK
     stats = _read_stats(containers)
-    title = "Fin Containers" + (" (all)" if show_all else "")
-    console.print(make_container_table(containers, stats=stats, title=title))
+    console.print(render_grouped_containers(containers, stats=stats))
     return EXIT_OK
 
 
-@reserved("exec", help="Exec a command in the current project's primary container.", group="Containers")
+@reserved(
+    "exec",
+    help="Exec a command in the current project's primary container.",
+    group="Containers",
+    usage="fin exec <command> [args...]",
+    examples=("fin exec php -v", "fin exec ls -la"),
+)
 def exec_cmd(args: list[str]) -> int:
     if not args:
         error("Usage: fin exec <command> [args...]", title="Invalid Argument")
@@ -92,7 +100,13 @@ def exec_cmd(args: list[str]) -> int:
     return int(code or 0)
 
 
-@reserved("inspect", help="Show rich JSON inspect for a container (default: primary).", group="Containers")
+@reserved(
+    "inspect",
+    help="Show rich JSON inspect for a container (default: primary).",
+    group="Containers",
+    usage="fin inspect [container]",
+    examples=("fin inspect", "fin inspect fin_mysql"),
+)
 def inspect(args: list[str]) -> int:
     env = ProjectEnv.load()
     if args and not args[0].startswith("-"):
@@ -103,7 +117,18 @@ def inspect(args: list[str]) -> int:
     return EXIT_OK
 
 
-@reserved("logs", help="Tail logs (--follow, --tail N, --since X). Default: primary.", group="Containers")
+@reserved(
+    "logs",
+    help="Tail logs (--follow, --tail N, --since X). Default: primary.",
+    group="Containers",
+    usage="fin logs [container] [--follow] [--tail N] [--since X]",
+    options=(
+        ("--follow, -f", "Stream new log lines as they arrive."),
+        ("--tail N", "Show only the last N lines."),
+        ("--since X", "Show logs since a timestamp or relative time."),
+    ),
+    examples=("fin logs", "fin logs --follow", "fin logs myapp-web --tail 100"),
+)
 def logs(args: list[str]) -> int:
     env = ProjectEnv.load()
     follow = "--follow" in args or "-f" in args

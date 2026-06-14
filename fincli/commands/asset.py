@@ -16,7 +16,18 @@ from fincli.core.proxy import ensure_proxy
 from fincli.ui.console import error, info, success, warning
 
 
-@reserved("asset", help="Manage shared asset containers: up | stop | down.")
+@reserved(
+    "asset",
+    help="Manage shared asset containers: up | stop | down.",
+    usage="fin asset <up|stop|down> [-f]",
+    subcommands=(
+        ("up", "Ensure the proxy and start every enabled asset container."),
+        ("stop", "Stop all asset containers without removing them."),
+        ("down", "Stop and remove all asset containers (-f to force)."),
+    ),
+    options=(("-f, --force", "Force-remove containers (with 'down')."),),
+    examples=("fin asset up", "fin asset stop", "fin asset down -f"),
+)
 def asset(args: list[str]) -> int:
     sub = args[0] if args else "up"
     rest = args[1:]

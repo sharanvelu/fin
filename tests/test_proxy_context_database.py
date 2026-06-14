@@ -127,6 +127,9 @@ def test_ensure_mysql_database_execs(monkeypatch):
     c = make_fake_container(name="fin_mysql", status="running")
     c.exec_run.return_value = type("R", (), {"exit_code": 0, "output": b""})()
     monkeypatch.setattr(db, "find_container", lambda name: c)
+    # The readiness wait runs its own exec_run probe first; short-circuit it so
+    # this test exercises only the CREATE DATABASE exec contract.
+    monkeypatch.setattr(db, "wait_for_ready", lambda container, **kw: True)
     db._ensure_mysql_database("mydb")
     c.exec_run.assert_called_once()
     args, kwargs = c.exec_run.call_args

@@ -8,7 +8,24 @@ from fincli.plugs.registry import Registry
 from fincli.ui.console import console, error, info, success
 
 
-@reserved("plugs", help="Manage plugs: list | info <name> | search <q> | install <name> | uninstall <name>.", group="Plugs")
+@reserved(
+    "plugs",
+    help="Manage plugs: list | info | search | install | uninstall.",
+    group="Plugs",
+    usage="fin plugs <list|info|search|install|uninstall> [name]",
+    subcommands=(
+        ("list", "List installed plugs (name, version, type, commands)."),
+        ("info <name>", "Show detailed info for an installed plug."),
+        ("search <query>", "Search the plug catalog (coming soon)."),
+        ("install <name|git-url>", "Install a plug into the plugs directory."),
+        ("uninstall <name>", "Remove an installed plug."),
+    ),
+    examples=(
+        "fin plugs list",
+        "fin plugs info laravel",
+        "fin plugs install https://github.com/acme/fin-plug-django.git",
+    ),
+)
 def plugs(args: list[str]) -> int:
     sub = args[0] if args else "list"
     target = args[1] if len(args) > 1 else None

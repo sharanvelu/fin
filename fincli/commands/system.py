@@ -30,7 +30,12 @@ from fincli.ui.console import error, info, success, warning
 # --------------------------------------------------------------------------- #
 # up
 # --------------------------------------------------------------------------- #
-@reserved("up", help="Start the project's containers (proxy, assets, primary).")
+@reserved(
+    "up",
+    help="Start the project's containers (proxy, assets, primary).",
+    usage="fin up",
+    examples=("fin up",),
+)
 def up(args: list[str]) -> int:
     env = ProjectEnv.load()
 
@@ -129,6 +134,14 @@ def _teardown(args: list[str], *, remove: bool) -> int:
 @reserved(
     "down",
     help="Stop and remove containers. Scopes: [asset|all]; -f to force.",
+    usage="fin down [asset|all] [-f]",
+    subcommands=(
+        ("(none)", "Remove this project's containers (app + worker)."),
+        ("asset", "Remove all shared asset containers."),
+        ("all", "Remove every Fin-managed container (incl. proxy & assets)."),
+    ),
+    options=(("-f, --force", "Force-remove containers."),),
+    examples=("fin down", "fin down asset", "fin down all -f"),
 )
 def down(args: list[str]) -> int:
     return _teardown(args, remove=True)
@@ -137,6 +150,13 @@ def down(args: list[str]) -> int:
 @reserved(
     "stop",
     help="Stop containers without removing. Scopes: [asset|all].",
+    usage="fin stop [asset|all]",
+    subcommands=(
+        ("(none)", "Stop this project's containers (app + worker)."),
+        ("asset", "Stop all shared asset containers."),
+        ("all", "Stop every Fin-managed container."),
+    ),
+    examples=("fin stop", "fin stop asset", "fin stop all"),
 )
 def stop(args: list[str]) -> int:
     return _teardown(args, remove=False)

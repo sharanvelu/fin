@@ -13,6 +13,7 @@ from __future__ import annotations
 from fincli.config import Config
 from fincli.core.containers import find_container
 from fincli.core.env import ProjectEnv
+from fincli.core.wait import mysql_ready, postgres_ready, wait_for_ready
 from fincli.ui.console import info, success, warning
 
 # DB_CONNECTION values mapped to the asset container that serves them.
@@ -50,6 +51,14 @@ def _ensure_mysql_database(database: str) -> None:
     container = _container_or_warn("fin_mysql", "MySQL")
     if container is None:
         return
+    # A freshly-started engine reports "running" before it accepts connections.
+    # Wait for it to answer a ping; skip gracefully (no raise) if it never does.
+    if not wait_for_ready(container, check=mysql_ready, description="MySQL"):
+        warning(
+            f"MySQL is not accepting connections yet; "
+            f"skipping creation of database '{database}'."
+        )
+        return
     sql = (
         f"CREATE DATABASE IF NOT EXISTS `{database}`; "
         f"GRANT ALL PRIVILEGES ON `{database}`.* "
@@ -74,6 +83,12 @@ def _ensure_mysql_database(database: str) -> None:
 def _ensure_postgres_database(database: str) -> None:
     container = _container_or_warn("fin_postgres", "Postgres")
     if container is None:
+        return
+    if not wait_for_ready(container, check=postgres_ready, description="Postgres"):
+        warning(
+            f"Postgres is not accepting connections yet; "
+            f"skipping creation of database '{database}'."
+        )
         return
     # Postgres has no CREATE DATABASE IF NOT EXISTS; guard with a check.
     check = (

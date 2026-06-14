@@ -23,7 +23,22 @@ def _asset_plug(name: str):
     return lp
 
 
-@reserved("config", help="Manage default asset plugs: enable|disable|get|list.")
+@reserved(
+    "config",
+    help="Manage default asset plugs: enable|disable|get|list.",
+    usage="fin config <enable|disable|get|list> [asset]",
+    subcommands=(
+        ("enable <asset>", "Mark an asset to auto-start with 'fin up'."),
+        ("disable <asset>", "Stop auto-starting an asset."),
+        ("get <asset>", "Show one asset's status and details."),
+        ("list", "List all asset plugs and their enabled/disabled status."),
+    ),
+    examples=(
+        "fin config list",
+        "fin config enable mysql",
+        "fin config get redis",
+    ),
+)
 def config(args: list[str]) -> int:
     sub = args[0] if args else "list"
     target = args[1] if len(args) > 1 else None

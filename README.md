@@ -212,7 +212,21 @@ Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):
 | `fin bin <command> ...` | Run `./vendor/bin/<command>`. |
 | `fin php ...` | Run the `php` binary. |
 
-Top-level: `fin --help` / `-h` / `help` shows the command overview;
+### Help
+
+- `fin --help` / `-h` / `help` — command overview (system commands grouped by
+  area, plus plug-contributed commands grouped by plug).
+- `fin <command> --help` / `-h`, or `fin help <command>` — detailed help for a
+  single command: description, usage, subcommands, options, and examples. Works
+  for reserved commands **and** plug commands (plug help also shows the plug's
+  required environment variables).
+
+```bash
+fin config --help     # subcommands: enable | disable | get | list
+fin down --help       # scopes [asset|all] and the -f flag
+fin artisan --help    # plug command help, incl. the laravel plug's env spec
+```
+
 `fin --version` / `-v` / `version` prints `Fin v<version>`.
 
 ## Environment variables

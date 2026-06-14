@@ -18,6 +18,13 @@ class ReservedCommand:
 
     The handler receives the remaining argv (after the command name) and
     returns an exit code.
+
+    Optional help metadata (used by ``fin <command> --help``):
+        usage:       a one-line usage string (e.g. ``fin down [asset|all] [-f]``).
+        subcommands: a list of ``(name, description)`` pairs for commands that
+                     dispatch on a first positional argument (config, asset, …).
+        options:     a list of ``(flag, description)`` pairs for notable flags.
+        examples:    example invocations shown verbatim.
     """
 
     name: str
@@ -25,6 +32,10 @@ class ReservedCommand:
     help: str = ""
     aliases: tuple[str, ...] = ()
     group: str = "System"
+    usage: str = ""
+    subcommands: tuple[tuple[str, str], ...] = ()
+    options: tuple[tuple[str, str], ...] = ()
+    examples: tuple[str, ...] = ()
 
 
 #: Global registry of reserved commands, keyed by name and alias.
@@ -34,12 +45,30 @@ RESERVED_CANONICAL: dict[str, ReservedCommand] = {}
 
 
 def reserved(
-    name: str, *, help: str = "", aliases: tuple[str, ...] = (), group: str = "System"
+    name: str,
+    *,
+    help: str = "",
+    aliases: tuple[str, ...] = (),
+    group: str = "System",
+    usage: str = "",
+    subcommands: tuple[tuple[str, str], ...] = (),
+    options: tuple[tuple[str, str], ...] = (),
+    examples: tuple[str, ...] = (),
 ) -> Callable[[Callable[[list[str]], int]], Callable[[list[str]], int]]:
     """Decorator registering a function as a reserved command."""
 
     def decorator(func: Callable[[list[str]], int]) -> Callable[[list[str]], int]:
-        cmd = ReservedCommand(name=name, handler=func, help=help, aliases=aliases, group=group)
+        cmd = ReservedCommand(
+            name=name,
+            handler=func,
+            help=help,
+            aliases=aliases,
+            group=group,
+            usage=usage,
+            subcommands=subcommands,
+            options=options,
+            examples=examples,
+        )
         RESERVED_COMMANDS[name] = cmd
         RESERVED_CANONICAL[name] = cmd
         for alias in aliases:

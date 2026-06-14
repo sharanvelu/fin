@@ -46,7 +46,20 @@ def _fin_images() -> list:
     return result
 
 
-@reserved("images", help="Manage Fin images: ls | rm <image> | prune.", aliases=("img",), group="Images")
+@reserved(
+    "images",
+    help="Manage Fin images: ls | rm <image> | prune.",
+    aliases=("img",),
+    group="Images",
+    usage="fin images <ls|rm|prune> [image]",
+    subcommands=(
+        ("ls", "List Fin-related images (alias: list)."),
+        ("rm <image>", "Remove an image (-f to force)."),
+        ("prune", "Remove dangling images (asks for confirmation)."),
+    ),
+    options=(("-f, --force", "Force-remove (with 'rm')."),),
+    examples=("fin images ls", "fin images rm traefik:v3.6", "fin images prune"),
+)
 def images(args: list[str]) -> int:
     sub = args[0] if args else "ls"
     rest = args[1:]

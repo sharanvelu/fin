@@ -26,9 +26,32 @@ def test_ps_empty(monkeypatch):
 def test_ps_lists(monkeypatch):
     c = make_fake_container(name="demo-web", status="running")
     monkeypatch.setattr(cc, "list_containers", lambda **kw: [c])
-    # avoid stats network calls; stub make_container_table to a sentinel
-    monkeypatch.setattr(cc, "make_container_table", lambda *a, **k: "TABLE")
+    # avoid stats network calls; stub the grouped renderer to a sentinel
+    monkeypatch.setattr(cc, "render_grouped_containers", lambda *a, **k: "GROUP")
     assert cc.ps([]) == EXIT_OK
+
+
+def test_ps_renders_grouped(monkeypatch):
+    """ps drives the grouped renderer over the listed containers."""
+    app = make_fake_container(
+        name="myapp-web", status="running",
+        labels={"FIN_TYPE": "app", "FIN_SERVICE": "web"},
+    )
+    asset = make_fake_container(
+        name="fin_redis", status="running", id="redis00000001",
+        labels={"FIN_TYPE": "asset", "FIN_SERVICE": "redis"},
+    )
+    captured = {}
+    monkeypatch.setattr(cc, "list_containers", lambda **kw: [app, asset])
+    monkeypatch.setattr(cc, "_read_stats", lambda containers: {})
+
+    def fake_render(containers, **kwargs):
+        captured["containers"] = list(containers)
+        return "GROUP"
+
+    monkeypatch.setattr(cc, "render_grouped_containers", fake_render)
+    assert cc.ps([]) == EXIT_OK
+    assert captured["containers"] == [app, asset]
 
 
 def test_ps_all_flag(monkeypatch):
