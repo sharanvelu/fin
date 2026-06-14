@@ -63,8 +63,7 @@ class Config:
     CONFIG_FILE: Path = _env_path("FIN_CONFIG_FILE", DATA_DIR / "config.json")
 
     # --- Shared asset defaults ---------------------------------------------
-    #: Credentials baked into the shared asset containers (DB/redis). These
-    #: mirror DockR's conventions so existing muscle memory carries over.
+    #: Credentials baked into the shared asset containers (DB/redis).
     ASSET_USERNAME: str = os.environ.get("FIN_ASSET_USERNAME", "fin")
     ASSET_PASSWORD: str = os.environ.get("FIN_ASSET_PASSWORD", "password")
     ASSET_DEFAULT_DATABASE: str = os.environ.get(

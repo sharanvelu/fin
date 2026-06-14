@@ -235,10 +235,10 @@ def _friendly_run_error(exc: Exception, *, name: str, ports: dict | None) -> Exc
         ) or "its published ports"
         return FinError(
             f"Could not start [bold]{name}[/bold]: {host_ports} already in use.\n"
-            "Another process (often another local proxy such as DockR's "
-            "dockr_proxy, or a system web server) is holding the port.\n"
-            "Free it, then run 'fin up' again — e.g. 'docker rm -f dockr_proxy', "
-            "or stop whatever is listening on that port.",
+            "Another process (often another local reverse proxy, or a system "
+            "web server) is holding the port.\n"
+            "Free it, then run 'fin up' again — stop whatever is listening on "
+            "that port, or remove the conflicting container.",
             title="Port In Use",
         )
     return FinError(f"Could not start {name}: {message}", title="Container Start Failed")
