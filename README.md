@@ -1,0 +1,454 @@
+# Fin
+
+> Run local dev containers, infinitely extensible via plugs.
+
+**Fin** is a fast, opinionated, plugin-driven CLI for running local-development
+Docker containers. Point it at a project, declare a few `FIN_*` variables in your
+`.env`, and `fin up` brings up everything that project needs — a routing proxy,
+shared databases/caches, and your application container — all on one Docker
+network, all reachable by friendly `*.localhost` hostnames.
+
+Fin is the superhero successor to [DockR](https://dockr.in): same muscle memory,
+a declarative plugin system, and a single audited path to the Docker daemon.
+
+---
+
+## Table of contents
+
+- [Highlights](#highlights)
+- [Prerequisites](#prerequisites)
+- [Install](#install)
+- [Quickstart (Laravel)](#quickstart-laravel)
+- [Command reference](#command-reference)
+- [Environment variables](#environment-variables)
+- [How it works](#how-it-works)
+- [Writing a plug](#writing-a-plug)
+- [Troubleshooting](#troubleshooting)
+- [Credits](#credits)
+
+---
+
+## Highlights
+
+- **One command up.** `fin up` ensures the proxy, starts enabled shared assets,
+  starts your app container, and creates the project database — idempotently.
+- **Plugin-driven (plugs).** Apps and services are *plugs*: small declarative
+  Python classes that describe containers and contribute commands. Bundled plugs
+  cover Laravel, MySQL, PostgreSQL and Redis; you can write your own.
+- **Automatic routing.** A built-in Traefik proxy routes web-exposed containers
+  by hostname (`Host(...)` / wildcard `HostRegexp`) — no port juggling.
+- **Shared assets.** One MySQL/Postgres/Redis container is shared across every
+  project, so multiple apps reuse the same database server.
+- **Friendly errors.** No raw tracebacks — Docker problems render as clean Rich
+  panels with meaningful exit codes.
+- **No virtualenv.** Fin runs against your system Python 3.11+; the installer
+  uses a `--user` pip install and a `fin` launcher symlinked onto your `PATH`.
+
+## Prerequisites
+
+- **Docker** running locally (Docker Desktop, Colima, Rancher Desktop, or Podman
+  with a Docker-compatible socket — Fin auto-detects the common socket paths).
+- **Python 3.11+** on your `PATH`.
+- **git** (used by the installer and by `fin plugs install`).
+
+## Install
+
+### One-liner
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/<org>/<repo>/main/install.sh)"
+```
+
+The installer:
+
+1. Verifies `git` and a Python 3.11+ interpreter.
+2. Clones the repo into `~/.fin-cli` (override with `FIN_HOME_DIR`).
+3. Installs the Python dependencies for the user, **no virtualenv**:
+   `python3 -m pip install --user typer rich docker`.
+4. Symlinks the `fin` launcher into the first writable directory on your `PATH`
+   (tries `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`; override with
+   `FIN_BIN_DIR`).
+
+Installer environment overrides:
+
+| Variable         | Purpose                       | Default                            |
+| ---------------- | ----------------------------- | ---------------------------------- |
+| `FIN_REPO_URL`   | git URL to clone              | the public Fin repo                |
+| `FIN_USE_BRANCH` | branch/tag to check out       | `main`                             |
+| `FIN_HOME_DIR`   | install location              | `$HOME/.fin-cli`                   |
+| `FIN_BIN_DIR`    | where to place the `fin` link | auto-detected writable `PATH` dir  |
+
+### Manual
+
+```bash
+git clone https://github.com/<org>/<repo>.git ~/.fin-cli
+cd ~/.fin-cli
+python3 -m pip install --user typer rich docker
+ln -sf ~/.fin-cli/fin /usr/local/bin/fin   # or any writable dir on your PATH
+fin --help
+```
+
+The `fin` launcher resolves its own real location (following symlinks), puts the
+Fin package on `PYTHONPATH`, and runs `python3 -m fincli` **from the directory
+you invoked it in** — so the project's `.env` and bind mounts work correctly.
+
+## Quickstart (Laravel)
+
+From inside a Laravel project, create or edit `.env`:
+
+```dotenv
+# Tell Fin which app plug runs this project, and where to serve it.
+FIN_APP=laravel
+FIN_SITE=myapp.localhost
+FIN_PHP_VERSION=8.3
+FIN_COMPOSER_VERSION=2
+
+# Auxiliary plugs to bring up with this project.
+FIN_PLUGS=mysql,redis
+
+# Standard Laravel DB config — Fin auto-creates the database in the shared engine.
+DB_CONNECTION=mysql
+DB_HOST=fin_mysql
+DB_PORT=3306
+DB_DATABASE=myapp
+DB_USERNAME=fin
+DB_PASSWORD=password
+
+REDIS_HOST=fin_redis
+```
+
+Then:
+
+```bash
+fin up
+```
+
+Fin starts the Traefik proxy, the shared `fin_mysql` and `fin_redis` containers,
+your Laravel container, creates the `myapp` database if it's missing, and prints:
+
+```
+✓ myapp is up at http://myapp.localhost
+```
+
+Run Laravel tooling inside the container:
+
+```bash
+fin artisan migrate
+fin composer require some/package
+fin tinker
+fin bash
+```
+
+Tear it down when you're done:
+
+```bash
+fin down            # this project's containers
+fin down asset      # shared asset containers
+fin down all        # everything Fin manages
+```
+
+> The shared asset containers connect on their service hostnames: `DB_HOST=fin_mysql`,
+> `REDIS_HOST=fin_redis`, `fin_postgres`. Default credentials are `fin` / `password`
+> (override with `FIN_ASSET_USERNAME` / `FIN_ASSET_PASSWORD`).
+
+## Command reference
+
+A sub-command is resolved in this order: **reserved (system) → `FIN_APP` plug →
+`FIN_PLUGS` plugs → `GLOBAL` plugs.** Reserved commands always win and are never
+delegated to a plug.
+
+### System
+
+| Command | Description |
+| ------- | ----------- |
+| `fin up` | Ensure the proxy, start enabled assets, start the primary app container, auto-create the DB. Requires `FIN_APP`. |
+| `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. `-f`/`--force` forces removal. |
+| `fin stop [asset\|all]` | Stop containers without removing them. Same scopes as `down`. |
+| `fin config enable\|disable\|get\|list` | Manage which **asset** plugs auto-start with `up`. |
+| `fin asset up\|stop\|down` | Manage the shared asset containers independently of any project. |
+
+### Containers
+
+| Command | Description |
+| ------- | ----------- |
+| `fin ps` (aliases `status`, `containers`) | List running Fin containers. `-a`/`--all` includes stopped ones. |
+| `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. |
+| `fin inspect [name]` | Rich JSON inspect of a container (default: the project's primary). |
+| `fin logs [name] [--follow/-f] [--tail N] [--since X]` | Tail logs (default: the project's primary). |
+
+### Images
+
+| Command | Description |
+| ------- | ----------- |
+| `fin images ls` (alias `fin img ls`, also `list`) | List Fin-related images (proxy + every loaded plug's images). |
+| `fin images rm <image> [-f]` | Remove an image. |
+| `fin images prune` | Remove dangling images (asks for confirmation). |
+
+### Plugs
+
+| Command | Description |
+| ------- | ----------- |
+| `fin plugs list` (alias `ls`) | List installed plugs and their commands. |
+| `fin plugs info <name>` | Show one plug's metadata and path. |
+| `fin plugs search <query>` | Search the remote catalog *(not yet wired up — reports a clear message)*. |
+| `fin plugs install <name\|git-url>` | Install a plug from a git URL (catalog install pending). |
+| `fin plugs uninstall <name>` | Remove an installed plug from disk. |
+
+### Laravel plug
+
+Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):
+
+| Command | Description |
+| ------- | ----------- |
+| `fin artisan ...` (alias `art`) | Run an `artisan` command. |
+| `fin composer ...` | Run `composer` in the container. |
+| `fin tinker` | Open a Laravel tinker session. |
+| `fin migrate [fresh\|rollback\|refresh] ...` | Run migrations. |
+| `fin seed [class]` | Run database seeders. |
+| `fin make <type> <name> ...` | Run `artisan make:<type>`. |
+| `fin queue [work\|listen\|restart] ...` | Run the queue (default `listen`). |
+| `fin bash` (alias `shell`) | Open a shell in the container. |
+| `fin phpunit ...` | Run `./vendor/bin/phpunit`. |
+| `fin bin <command> ...` | Run `./vendor/bin/<command>`. |
+| `fin php ...` | Run the `php` binary. |
+
+Top-level: `fin --help` / `-h` / `help` shows the command overview;
+`fin --version` / `-v` / `version` prints `Fin v<version>`.
+
+## Environment variables
+
+### Project variables (read from `./.env`, or the process environment)
+
+Process environment variables take precedence over the `.env` file, so
+`FIN_SITE=other.localhost fin up` works for a one-off override.
+
+| Variable | Meaning |
+| -------- | ------- |
+| `FIN_APP` (a.k.a. `FIN_PLUG`) | Name of the primary **app** plug for this project (e.g. `laravel`). Required by `fin up`. |
+| `FIN_PLUGS` | Comma-separated list of auxiliary plugs to consider/start (e.g. `mysql,redis`). |
+| `FIN_SITE` | The host the app is routed at (e.g. `myapp.localhost`). Drives Traefik routing. |
+| `FIN_CONTAINER_NAME` | Override the project name (defaults to the cwd basename, lowercased). |
+| `FIN_DOCKER_IMAGE` | Override the primary container image. |
+| `FIN_OVERRIDE_ASSETS` | Comma-separated assets to start, overriding the persisted enable flags. |
+| `FIN_PHP_VERSION` | *(Laravel)* PHP/image tag, e.g. `8.3`, `8.2`, `latest`. Default `latest`. |
+| `FIN_COMPOSER_VERSION` | *(Laravel)* Composer major version, `1` or `2`. Default `2`. |
+| `DB_CONNECTION`, `DB_DATABASE`, `DB_HOST`, ... | Standard Laravel DB config. `fin up` auto-creates `DB_DATABASE` in the shared MySQL/Postgres engine. |
+| `REDIS_*` | Standard Redis config (parsed alongside `DB_*`). |
+
+### System / installer variables (process environment)
+
+| Variable | Meaning | Default |
+| -------- | ------- | ------- |
+| `FIN_NETWORK` | The Docker network all Fin containers join. | `fin` |
+| `FIN_ROOT` | Root of the installed Fin source tree (set by the launcher). | the package dir |
+| `FIN_DATA_DIR` | Per-user data dir (config, registry). | `~/.fin` |
+| `FIN_PLUGS_DIR` | Directory holding plugs, grouped into `App/`, `Asset/`, `Global/`. | bundled `./plugs` |
+| `FIN_REGISTRY_DB` | SQLite plug-metadata cache. | `~/.fin/registry.db` |
+| `FIN_CONFIG_FILE` | Persisted asset enable/disable flags. | `~/.fin/config.json` |
+| `FIN_ASSET_USERNAME` / `FIN_ASSET_PASSWORD` | Credentials baked into shared asset containers. | `fin` / `password` |
+| `FIN_ASSET_DEFAULT_DATABASE` | Default DB created in asset engines. | `fin` |
+| `FIN_PROXY_IMAGE` | Traefik image for the proxy. | `traefik:v3.6` |
+| `FIN_PYTHON` | Force a specific Python interpreter for the launcher. | auto-detected |
+| `DOCKER_HOST` | If set, Fin defers to the Docker SDK's own socket handling. | unset |
+
+## How it works
+
+### The proxy
+
+A single, always-on Traefik container named `fin_proxy` (image `traefik:v3.6`)
+runs on the Fin network. It uses Traefik's Docker provider with
+`exposedbydefault=false`, so it routes a container **only** when that container
+carries Traefik labels. Entrypoints `web` (`:80`) and `websecure` (`:443`) are
+published to the host, and the dashboard is available at
+`http://traefik.localhost` (`:8080`). `fin up` and `fin asset up` ensure the
+proxy is running before anything else.
+
+### Assets
+
+Assets are shared, fixed-name containers (`fin_mysql`, `fin_postgres`,
+`fin_redis`) reused across all projects. Which assets start on `up` is resolved
+by:
+
+1. `FIN_OVERRIDE_ASSETS` (comma-separated) — if set, it wins outright.
+2. Otherwise, every asset explicitly enabled via `fin config enable <asset>`
+   (persisted in `~/.fin/config.json`), **plus** any asset named in `FIN_PLUGS`.
+
+### Labels and routing
+
+Every Fin container carries these labels (the master filter is `FIN_MANAGED=true`):
+
+| Label | Value |
+| ----- | ----- |
+| `FIN_MANAGED` | always `true` |
+| `FIN_TYPE` | `app` \| `asset` \| `global` \| `proxy` |
+| `FIN_SERVICE` | `web`, `mysql`, `redis`, `postgres`, `proxy`, ... |
+| `FIN_SITE` | the routed URL, or `-` |
+| `FIN_PROJECT` | the project name, or `-` for shared containers |
+
+Web-exposed services additionally get Traefik routing labels derived from
+`FIN_SITE`: a router `rule` (`Host(`myapp.localhost`)`, or `HostRegexp(...)` for
+`*.` wildcards), `entrypoints=web,websecure`, a `service` named `<key>_service`,
+and a loadbalancer `server.port` taken from the plug's spec. The router key is
+the host with `*.`/`.localhost` stripped and `.`/`-` replaced by `_`
+(`my-app.localhost` → `my_app`).
+
+### Command resolution order
+
+```
+fin <command> [args...]
+  1. reserved (system) commands   ← owned by Fin, never delegated
+  2. the FIN_APP / FIN_PLUG plug   ← primary app plug
+  3. the FIN_PLUGS plugs           ← auxiliary plugs, in declared order
+  4. GLOBAL plugs                  ← everything under Global/
+```
+
+The first match wins. Plug lookup is lazy and de-duplicated by plug name.
+
+## Writing a plug
+
+A plug is a Python package under the plugs directory, grouped by type:
+
+```
+<PLUGS_DIR>/
+  App/<name>/__init__.py      # PlugType.APP
+  Asset/<name>/__init__.py    # PlugType.ASSET
+  Global/<name>/__init__.py   # PlugType.GLOBAL
+```
+
+`PLUGS_DIR` defaults to the bundled `./plugs` directory and is configurable via
+`FIN_PLUGS_DIR`. The loader imports each package, finds the single class that
+subclasses `FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and
+calls `setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
+
+**Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
+objects and asks `PlugContext` to exec inside a running container — it must never
+call Docker itself. Fin's orchestrator is the sole code path that touches the
+daemon.
+
+### Minimal ASSET plug
+
+`Asset/memcached/__init__.py`:
+
+```python
+from __future__ import annotations
+
+from fincli.plugs.base import ContainerSpec, FinPlug, PlugType, PortMapping, VolumeMount
+
+
+class MemcachedPlug(FinPlug):
+    name = "memcached"
+    version = "1.0.0"
+    plug_type = PlugType.ASSET
+    description = "Shared Memcached container."
+
+    def asset_specs(self, env) -> list[ContainerSpec]:
+        return [
+            ContainerSpec(
+                service="memcached",
+                image="memcached:1.6-alpine",
+                container_name="fin_memcached",   # fixed, shared name
+                ports=[PortMapping(container=11211, host=11211)],
+                volumes=[VolumeMount(host="fin_asset_memcached", container="/data")],
+            )
+        ]
+```
+
+Enable it to auto-start with `fin config enable memcached`, or list it in
+`FIN_PLUGS`.
+
+### Minimal APP plug
+
+`App/static/__init__.py`:
+
+```python
+from __future__ import annotations
+
+from fincli.core.env import EnvSpec, EnvVar
+from fincli.plugs.base import ContainerSpec, FinPlug, PlugCommand, PlugType, PortMapping
+from fincli.plugs.context import PlugContext
+
+WEBROOT = "/usr/share/nginx/html"
+
+
+class StaticPlug(FinPlug):
+    name = "static"
+    version = "1.0.0"
+    plug_type = PlugType.APP
+    description = "Static site served by nginx."
+
+    def env_spec(self) -> EnvSpec:
+        # Declare what this plug needs; `fin up` validates it and reports
+        # *all* problems at once before doing any work.
+        return EnvSpec.of([
+            EnvVar("FIN_SITE", required=True,
+                   description="hostname the site is served at"),
+        ])
+
+    def primary_spec(self, env) -> ContainerSpec:
+        image = env.get("FIN_DOCKER_IMAGE") or "nginx:stable-alpine"
+        return ContainerSpec(
+            service="web",
+            image=image,
+            name_suffix="web",
+            ports=[PortMapping(container=80, host=None)],  # Traefik routes it
+            web_exposed=True,
+            web_port=80,             # loadbalancer port for the router
+            workdir_mount=WEBROOT,   # cwd is bind-mounted here by `up`
+        )
+
+    def commands(self):
+        return {
+            "sh": PlugCommand("sh", _sh, "Open a shell in the container.",
+                              aliases=("shell",)),
+        }
+
+
+def _sh(ctx: PlugContext, args: list[str]) -> int:
+    return ctx.exec(["sh"], workdir=WEBROOT)
+```
+
+Key points:
+
+- **`primary_spec(env)`** (APP) returns the one primary `ContainerSpec`. Set
+  `web_exposed=True` + `web_port=...` to get Traefik routing from `FIN_SITE`. Set
+  `workdir_mount` and `up` will bind-mount the project directory there.
+- **`asset_specs(env)`** (ASSET) returns shared-container specs with a fixed
+  `container_name`.
+- **`commands()`** maps a name to a `PlugCommand(name, handler, help, aliases)`.
+  Handlers receive `(ctx: PlugContext, args: list[str])` and return an exit code.
+  Use `ctx.exec([...], workdir=...)` to run inside the primary container.
+- **`env_spec()`** declares required/optional vars, `choices`, types, and
+  defaults; `EnvSpec.validate(env)` raises one friendly error listing every
+  problem.
+
+After adding a plug, `fin plugs list` re-scans the directory and refreshes the
+SQLite registry automatically.
+
+## Troubleshooting
+
+**"Could not connect to Docker. Is Docker running?"** — Fin auto-detects common
+Docker sockets (Docker Desktop, Colima, Rancher Desktop, Podman, and the standard
+`/var/run/docker.sock`). Start your Docker engine, or set `DOCKER_HOST`
+explicitly to defer to the Docker SDK's own handling. This is a *system* error
+and exits with code `2`.
+
+**"No primary app plug configured. Set FIN_APP ..."** — `fin up` needs `FIN_APP`
+(or `FIN_PLUG`) set in the project's `.env`.
+
+**"App plug '<name>' is not installed."** — Check `fin plugs list`; ensure the
+plug exists under `App/<name>` in your `PLUGS_DIR` (or `FIN_PLUGS_DIR`).
+
+**The `fin` command isn't found** — the installer warns if its chosen bin
+directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PATH"`.
+
+**Exit codes:** `0` success · `1` user error (bad input, missing env, not found)
+· `2` system/Docker error (daemon down, API failure).
+
+## Credits
+
+Fin is the superhero successor to **[DockR](https://dockr.in)** and keeps its
+conventions — default `fin` / `password` credentials, the shared-asset model, and
+familiar Laravel commands — so existing muscle memory carries straight over.
+Built on [Typer](https://typer.tiangolo.com/), [Rich](https://rich.readthedocs.io/),
+the [Docker SDK for Python](https://docker-py.readthedocs.io/), and
+[Traefik](https://traefik.io/). MIT licensed.

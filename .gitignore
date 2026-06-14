@@ -1,0 +1,28 @@
+# Bundled plugs — placed elsewhere on the system at install time.
+# Kept out of version control per project spec.
+/plugs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs (Fin never uses one, but ignore if a dev makes one)
+.venv/
+venv/
+env/
+
+# Local data
+*.db
+*.sqlite3
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

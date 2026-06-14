@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Fin — bootstrap launcher.
+#
+# This file is symlinked onto PATH (e.g. /usr/local/bin/fin) by install.sh.
+# It resolves its own real location (following symlinks), puts the Fin package
+# on PYTHONPATH, and execs the Python entrypoint. No virtualenv is used or
+# required — Fin runs against the system Python 3.11+ interpreter.
+
+set -euo pipefail
+
+# --- Resolve the real path of this script, following symlinks ---------------
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  # If the symlink target is relative, resolve it against the link's dir.
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+FIN_ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+export FIN_ROOT
+
+# --- Locate a suitable Python interpreter (3.11+) ---------------------------
+PYTHON_BIN="${FIN_PYTHON:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  for candidate in python3.13 python3.12 python3.11 python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      PYTHON_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$PYTHON_BIN" ]; then
+  echo "fin: could not find a Python interpreter. Fin requires Python 3.11+." >&2
+  exit 2
+fi
+
+# --- Run from the directory the user invoked fin from -----------------------
+# The Fin package reads the *current working directory* (the project) for its
+# .env and bind mounts, so we must NOT change directory here.
+export PYTHONPATH="${FIN_ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+
+exec "$PYTHON_BIN" -m fincli "$@"
