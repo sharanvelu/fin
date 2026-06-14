@@ -129,8 +129,16 @@ def test_ensure_mysql_database_execs(monkeypatch):
     monkeypatch.setattr(db, "find_container", lambda name: c)
     db._ensure_mysql_database("mydb")
     c.exec_run.assert_called_once()
-    args, _ = c.exec_run.call_args
-    assert "mydb" in args[0][2]  # the SQL command
+    args, kwargs = c.exec_run.call_args
+    argv = args[0]
+    # argv must be passed directly (NOT wrapped in `sh -c`), otherwise the
+    # backticks around the DB name get interpreted as shell command
+    # substitution. Guard against that regression.
+    assert argv[0] == "mysql"
+    assert argv[:2] != ["sh", "-c"]
+    assert any("mydb" in part for part in argv)  # SQL references the DB name
+    # Password is supplied via the exec environment, not interpolated.
+    assert kwargs.get("environment", {}).get("MYSQL_PWD")
 
 
 def test_ensure_mysql_database_container_missing(monkeypatch):

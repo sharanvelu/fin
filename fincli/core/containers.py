@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 from fincli.config import Config
 from fincli.core.docker_client import get_docker
-from fincli.core.errors import NotFound
+from fincli.core.errors import FinError, NotFound
 
 
 # --------------------------------------------------------------------------- #
@@ -201,5 +201,44 @@ def run_container(
     if extra:
         kwargs.update(extra)
 
-    container = client.containers.run(**kwargs)
+    try:
+        container = client.containers.run(**kwargs)
+    except Exception as exc:  # noqa: BLE001 - normalised below
+        # A failed run (e.g. a port bind error) can leave a half-created
+        # container behind, which would block every subsequent attempt. Remove
+        # it so retries start clean, then surface an actionable message.
+        _cleanup_failed(client, name)
+        raise _friendly_run_error(exc, name=name, ports=ports) from exc
     return RunResult(container=container, created=True)
+
+
+def _cleanup_failed(client: Any, name: str) -> None:
+    """Best-effort removal of a half-created container after a failed run."""
+    try:
+        leftover = client.containers.list(all=True, filters={"name": f"^{name}$"})
+        for c in leftover:
+            c.remove(force=True)
+    except Exception:  # noqa: BLE001 - cleanup must never mask the real error
+        pass
+
+
+def _friendly_run_error(exc: Exception, *, name: str, ports: dict | None) -> Exception:
+    """Translate a raw Docker run error into a friendly :class:`FinError`.
+
+    Port-allocation clashes get a targeted hint; everything else is wrapped so
+    the caller still renders a clean panel rather than a traceback.
+    """
+    message = str(getattr(exc, "explanation", None) or exc)
+    if "port is already allocated" in message or "address already in use" in message.lower():
+        host_ports = ", ".join(
+            str(v) for v in (ports or {}).values() if v is not None
+        ) or "its published ports"
+        return FinError(
+            f"Could not start [bold]{name}[/bold]: {host_ports} already in use.\n"
+            "Another process (often another local proxy such as DockR's "
+            "dockr_proxy, or a system web server) is holding the port.\n"
+            "Free it, then run 'fin up' again — e.g. 'docker rm -f dockr_proxy', "
+            "or stop whatever is listening on that port.",
+            title="Port In Use",
+        )
+    return FinError(f"Could not start {name}: {message}", title="Container Start Failed")

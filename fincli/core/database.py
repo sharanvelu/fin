@@ -55,11 +55,13 @@ def _ensure_mysql_database(database: str) -> None:
         f"GRANT ALL PRIVILEGES ON `{database}`.* "
         f"TO '{Config.ASSET_USERNAME}'@'%'; FLUSH PRIVILEGES;"
     )
-    cmd = [
-        "sh", "-c",
-        f'MYSQL_PWD="{Config.ASSET_PASSWORD}" mysql -u root -e "{sql}"',
-    ]
-    result = container.exec_run(cmd, demux=False)
+    # Pass argv directly (no `sh -c`) so backticks in the SQL are NOT treated
+    # as shell command substitution. The password goes via the exec env.
+    result = container.exec_run(
+        ["mysql", "-u", "root", "-e", sql],
+        demux=False,
+        environment={"MYSQL_PWD": Config.ASSET_PASSWORD},
+    )
     if result.exit_code == 0:
         success(f"Database [bold]{database}[/bold] is ready (MySQL).")
     else:
