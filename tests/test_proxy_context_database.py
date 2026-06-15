@@ -72,24 +72,45 @@ def test_plug_context_exec_not_running(monkeypatch, tmp_path):
 
 
 def test_plug_context_exec_streams(monkeypatch, tmp_path):
+    # The one-shot path delegates to streamed_exec (which allocates a TTY when
+    # stdout is a terminal so colours survive) and returns its exit code.
     import fincli.plugs.context as ctxmod
+    import fincli.core.interactive as inter
+
     c = make_fake_container(name="demo-web", status="running")
-    c.exec_run.return_value = (5, iter([b"out"]))
     monkeypatch.setattr(ctxmod, "find_primary", lambda project, service: c)
+
+    captured = {}
+
+    def fake_streamed(container, cmd, *, workdir=None, tty=None):
+        captured["cmd"] = cmd
+        captured["workdir"] = workdir
+        return 5
+
+    monkeypatch.setattr(inter, "streamed_exec", fake_streamed)
     ctx = PlugContext(env=_env(tmp_path), project="demo")
     rc = ctx.exec(["php", "artisan"], workdir="/app")
     assert rc == 5
-    _, kwargs = c.exec_run.call_args
-    assert kwargs["workdir"] == "/app"
+    assert captured["cmd"] == ["php", "artisan"]
+    assert captured["workdir"] == "/app"
 
 
-def test_plug_context_exec_none_code(monkeypatch, tmp_path):
+def test_plug_context_exec_interactive_routes(monkeypatch, tmp_path):
     import fincli.plugs.context as ctxmod
+    import fincli.core.interactive as inter
+
     c = make_fake_container(name="demo-web", status="running")
-    c.exec_run.return_value = (None, iter([b"out"]))
     monkeypatch.setattr(ctxmod, "find_primary", lambda project, service: c)
+    seen = {}
+
+    def fake_interactive(container, cmd, **kw):
+        seen["interactive"] = True
+        return 0
+
+    monkeypatch.setattr(inter, "interactive_exec", fake_interactive)
     ctx = PlugContext(env=_env(tmp_path), project="demo")
-    assert ctx.exec(["x"]) == 0
+    assert ctx.exec(["bash"], interactive=True) == 0
+    assert seen.get("interactive") is True
 
 
 # --------------------------------------------------------------------------- #

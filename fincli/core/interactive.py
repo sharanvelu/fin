@@ -28,6 +28,20 @@ from typing import Any
 from fincli.core.docker_client import get_docker
 
 
+def stdout_is_tty() -> bool:
+    """True when Fin's own stdout is a real terminal.
+
+    Used to decide whether to allocate a pseudo-TTY for an exec: with a TTY,
+    in-container programs (artisan, composer, ls, …) emit ANSI colours; without
+    one they detect a pipe and strip colour. When stdout is redirected/piped we
+    keep ``tty=False`` so the captured output stays clean.
+    """
+    try:
+        return sys.stdout.isatty()
+    except (ValueError, AttributeError, OSError):
+        return False
+
+
 def _raw_socket(sock: Any) -> Any:
     """Return the underlying OS socket from docker-py's exec_start result.
 
@@ -64,14 +78,14 @@ def interactive_exec(container: Any, cmd: list[str] | str, *, workdir: str | Non
         stdin_fd = -1
 
     if not stdin_is_tty:
-        return _streamed_exec(api, container, cmd, workdir=workdir)
+        return streamed_exec(container, cmd, workdir=workdir)
 
     try:
         import select
         import termios
         import tty as tty_mod
     except ImportError:  # pragma: no cover - non-Unix fallback
-        return _streamed_exec(api, container, cmd, workdir=workdir)
+        return streamed_exec(container, cmd, workdir=workdir)
 
     create_kwargs: dict[str, Any] = {
         "stdin": True,
@@ -158,17 +172,43 @@ def interactive_exec(container: Any, cmd: list[str] | str, *, workdir: str | Non
         return 0
 
 
-def _streamed_exec(api: Any, container: Any, cmd: list[str] | str, *, workdir: str | None) -> int:
-    """Non-interactive fallback: run the exec and stream its output."""
+def streamed_exec(
+    container: Any,
+    cmd: list[str] | str,
+    *,
+    workdir: str | None = None,
+    tty: bool | None = None,
+) -> int:
+    """Run a one-shot exec, stream its output, and return the real exit code.
+
+    Used for non-interactive commands (``fin artisan migrate``,
+    ``fin composer install``, …) and as the fallback when there's no local
+    stdin TTY.
+
+    A pseudo-TTY is allocated when *tty* is True, or — when *tty* is None — when
+    Fin's own stdout is a terminal (:func:`stdout_is_tty`). Allocating the TTY is
+    what makes the in-container program emit ANSI colours; the bytes (escape
+    codes included) are streamed straight through to the terminal. When stdout
+    is piped/redirected, no TTY is allocated so the captured output stays clean.
+
+    The exit code is read via ``exec_inspect`` so failures (e.g. ``fin phpunit``)
+    propagate correctly.
+    """
     from fincli.ui.console import console
 
-    create_kwargs: dict[str, Any] = {"stdout": True, "stderr": True, "tty": False}
+    api = get_docker().client.api
+    want_tty = stdout_is_tty() if tty is None else tty
+
+    create_kwargs: dict[str, Any] = {"stdout": True, "stderr": True, "tty": want_tty}
     if workdir:
         create_kwargs["workdir"] = workdir
     exec_id = api.exec_create(container.id, cmd, **create_kwargs)["Id"]
-    stream = api.exec_start(exec_id, stream=True, demux=False)
+
+    stream = api.exec_start(exec_id, tty=want_tty, stream=True, demux=False)
     for chunk in stream:
         if chunk:
+            # Decode per-chunk (errors="replace"); ANSI escapes are ASCII and
+            # pass through unharmed, rendering as colour in the terminal.
             console.file.write(chunk.decode("utf-8", errors="replace"))
             console.file.flush()
     try:

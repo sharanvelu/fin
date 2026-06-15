@@ -52,7 +52,7 @@ class PlugContext:
         For one-shot commands (``artisan migrate``, ``composer install``) leave
         ``interactive=False`` — output is streamed to the terminal.
         """
-        from fincli.ui.console import console, warning
+        from fincli.ui.console import warning
 
         container = find_primary(self.project, self.service)
         if container.status != "running":
@@ -64,16 +64,9 @@ class PlugContext:
 
             return interactive_exec(container, cmd, workdir=workdir)
 
-        # One-shot: stream output, no stdin attached.
-        exec_kwargs: dict = {"tty": False, "stream": True, "demux": False}
-        if workdir:
-            exec_kwargs["workdir"] = workdir
-        code, output = container.exec_run(cmd, **exec_kwargs)
-        if output is not None:
-            for chunk in output:
-                console.file.write(chunk.decode("utf-8", errors="replace"))
-                console.file.flush()
-        # When streaming, the exit code may be None until drained.
-        if code is None:
-            code = 0
-        return int(code)
+        # One-shot: stream output (no stdin attached). A pseudo-TTY is allocated
+        # when Fin's stdout is a terminal so the in-container program keeps its
+        # ANSI colours; piped output stays clean. Real exit code is returned.
+        from fincli.core.interactive import streamed_exec
+
+        return streamed_exec(container, cmd, workdir=workdir)
