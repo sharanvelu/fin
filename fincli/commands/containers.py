@@ -14,6 +14,7 @@ from fincli.commands import reserved
 from fincli.core.containers import find_container, find_primary, list_containers
 from fincli.core.env import ProjectEnv
 from fincli.ui.console import console, error, info
+from fincli.ui.spinners import fin_spinner
 from fincli.ui.tables import render_grouped_containers
 
 
@@ -67,12 +68,15 @@ def _mem_usage(s: dict) -> str:
 )
 def ps(args: list[str]) -> int:
     show_all = "-a" in args or "--all" in args
-    containers = list_containers(all_=show_all)
-    if not containers:
-        info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
-        return EXIT_OK
-    stats = _read_stats(containers)
-    console.print(render_grouped_containers(containers, stats=stats))
+    with fin_spinner(f"Getting running containers..."):
+        containers = list_containers(all_=show_all)
+        if not containers:
+            info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
+            return EXIT_OK
+        stats = _read_stats(containers)
+        grouped_containers = render_grouped_containers(containers, stats=stats)
+
+    console.print(grouped_containers)
     return EXIT_OK
 
 
