@@ -169,6 +169,23 @@ def test_grouped_tables_skip_empty_sections():
     assert sections[0][1].row_count == 1
 
 
+def test_grouped_tables_share_column_widths():
+    # Sections have very different content widths; every section's columns must
+    # still be pinned to one shared width so the tables line up.
+    app = _typed("app", name="a-really-long-application-name-web", id="app000000001",
+                 labels={"FIN_SERVICE": "web", "FIN_SITE": "http://strt.localhost"})
+    asset = _typed("asset", name="fin_mysql", id="asset0000001",
+                   labels={"FIN_SERVICE": "mysql"})
+    other = _typed("proxy", name="fin_proxy", id="proxy0000001",
+                   labels={"FIN_SERVICE": "proxy"})
+    sections = make_grouped_container_tables([app, asset, other])
+    assert len(sections) == 3
+    width_sets = [tuple(col.width for col in table.columns) for _, table in sections]
+    # All columns carry an explicit width, and every table shares the same set.
+    assert all(w is not None for w in width_sets[0])
+    assert width_sets[0] == width_sets[1] == width_sets[2]
+
+
 def test_grouped_unknown_type_goes_to_other():
     # No FIN_TYPE label at all -> Other.
     c = make_fake_container(name="mystery", labels={"FIN_SERVICE": "x"})

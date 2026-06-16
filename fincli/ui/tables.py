@@ -165,6 +165,65 @@ def _section_key(container: Any) -> str:
     return "other"
 
 
+#: Single source of truth for the grouped-table columns: (header, column kwargs).
+_COLUMN_DEFS: tuple[tuple[str, dict[str, Any]], ...] = (
+    ("ID", {"style": "dim", "no_wrap": True}),
+    ("Name", {"style": "bold"}),
+    ("Service", {"style": "magenta"}),
+    ("Site", {}),
+    ("State", {}),
+    ("Status", {}),
+    ("Ports", {}),
+    ("CPU%", {"justify": "right"}),
+    ("Mem", {"justify": "right"}),
+)
+
+
+def _row_plain(container: Any, stats: dict[str, dict[str, str]] | None) -> list[str]:
+    """Return the nine plain-text cell values for a container (no markup).
+
+    The same plain values drive both width calculation and rendering; the State
+    cell gets its colour applied via markup, so its visible width still matches.
+    """
+    labels = _container_labels(container)
+    status = getattr(container, "status", "") or ""
+    cpu = mem = "-"
+    cid = getattr(container, "id", None)
+    row_stats: dict[str, str] | None = None
+    if stats and isinstance(cid, str):
+        row_stats = stats.get(cid)
+    if row_stats:
+        cpu = row_stats.get("cpu", "-")
+        mem = row_stats.get("mem", "-")
+    return [
+        getattr(container, "short_id", "") or "",
+        getattr(container, "name", "") or "",
+        labels.get(Config.LABEL_SERVICE, "-") or "-",
+        labels.get(Config.LABEL_SITE, "-") or "-",
+        status.capitalize() or "-",
+        uptime_status(container),
+        _ports_to_str(container),
+        cpu,
+        mem,
+    ]
+
+
+def _shared_column_widths(
+    containers: list[Any], stats: dict[str, dict[str, str]] | None
+) -> list[int]:
+    """Max visible width per column across *all* containers (incl. headers).
+
+    Applying one width per column to every section makes the grouped tables
+    render with identical column — and therefore overall — widths, so they
+    line up exactly.
+    """
+    widths = [len(header) for header, _ in _COLUMN_DEFS]
+    for c in containers:
+        for i, value in enumerate(_row_plain(c, stats)):
+            widths[i] = max(widths[i], len(str(value)))
+    return widths
+
+
 def make_grouped_container_tables(
     containers: Iterable[Any],
     *,
@@ -174,17 +233,23 @@ def make_grouped_container_tables(
 
     Sections are returned in the order App, Asset, Other and only included
     when they contain at least one container. Each table carries the columns
-    ID, Name, Service, Site, State, Status, Ports, CPU%, Mem.
+    ID, Name, Service, Site, State, Status, Ports, CPU%, Mem — and every
+    section shares one set of column widths so the tables align perfectly.
     """
+    containers = list(containers)
     buckets: dict[str, list[Any]] = {"app": [], "asset": [], "other": []}
     for c in containers:
         buckets[_section_key(c)].append(c)
+
+    widths = _shared_column_widths(containers, stats)
 
     sections: list[tuple[str, Table]] = []
     for header, key in _SECTIONS:
         members = buckets[key]
         if members:
-            sections.append((header, _build_container_table(members, stats=stats)))
+            sections.append(
+                (header, _build_container_table(members, stats=stats, widths=widths))
+            )
     return sections
 
 
@@ -205,44 +270,27 @@ def _build_container_table(
     containers: Iterable[Any],
     *,
     stats: dict[str, dict[str, str]] | None = None,
+    widths: list[int] | None = None,
 ) -> Table:
     """Build one grouped-section table.
 
-    Columns: ID, Name, Service, Site, State, Status, Ports, CPU%, Mem.
+    Columns: ID, Name, Service, Site, State, Status, Ports, CPU%, Mem. When
+    *widths* is given, each column is pinned to that width so multiple section
+    tables align; otherwise columns auto-size to their own content.
     """
     table = Table(header_style="bold cyan", expand=False)
-    table.add_column("ID", style="dim", no_wrap=True)
-    table.add_column("Name", style="bold")
-    table.add_column("Service", style="magenta")
-    table.add_column("Site")
-    table.add_column("State")
-    table.add_column("Status")
-    table.add_column("Ports")
-    table.add_column("CPU%", justify="right")
-    table.add_column("Mem", justify="right")
+    for i, (header, opts) in enumerate(_COLUMN_DEFS):
+        col_opts = dict(opts)
+        if widths is not None:
+            col_opts["width"] = widths[i]
+        table.add_column(header, **col_opts)
 
     for c in containers:
-        labels = _container_labels(c)
-        service = labels.get(Config.LABEL_SERVICE, "-") or "-"
-        site = labels.get(Config.LABEL_SITE, "-") or "-"
-        status = getattr(c, "status", "") or ""
-        style = status_style(status)
-        state_text = status.capitalize() or "-"
-        cpu = mem = "-"
-        if stats and c.id in stats:
-            cpu = stats[c.id].get("cpu", "-")
-            mem = stats[c.id].get("mem", "-")
-        table.add_row(
-            c.short_id,
-            c.name,
-            service,
-            site,
-            f"[{style}]{state_text}[/{style}]",
-            uptime_status(c),
-            _ports_to_str(c),
-            cpu,
-            mem,
-        )
+        values = _row_plain(c, stats)
+        style = status_style(getattr(c, "status", "") or "")
+        # Colour the State cell (index 4) without changing its visible width.
+        values[4] = f"[{style}]{values[4]}[/{style}]"
+        table.add_row(*values)
     return table
 
 
