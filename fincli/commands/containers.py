@@ -68,7 +68,7 @@ def _mem_usage(s: dict) -> str:
 )
 def ps(args: list[str]) -> int:
     show_all = "-a" in args or "--all" in args
-    with fin_spinner(f"Getting running containers..."):
+    with fin_spinner(f"Getting {'all' if show_all else 'running'} containers..."):
         containers = list_containers(all_=show_all)
         if not containers:
             info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
