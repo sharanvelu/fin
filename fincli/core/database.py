@@ -72,7 +72,7 @@ def _ensure_mysql_database(database: str) -> None:
         environment={"MYSQL_PWD": Config.ASSET_PASSWORD},
     )
     if result.exit_code == 0:
-        success(f"Database [bold]{database}[/bold] is ready (MySQL).")
+        success(f"Database [bold]{database}[/bold] is ready [dim](MySQL)[/dim]")
     else:
         warning(
             f"Could not ensure MySQL database '{database}': "

@@ -52,7 +52,9 @@ def start_primary(spec: ContainerSpec, env: ProjectEnv) -> Any:
     site = env.get("FIN_SITE", "-") or "-"
 
     labels = base_labels(
-        fin_type="app", service=spec.service, site=f"http://{site}" if site != "-" else "-",
+        fin_type="app",
+        service=spec.service,
+        site=f"http://{site}" if site != "-" else "-",
         project=project,
     )
     if spec.web_exposed and spec.web_port and site != "-":
@@ -129,7 +131,11 @@ def start_asset(spec: ContainerSpec, fin_type: str = "asset") -> Any:
     """Start a shared asset/proxy container (idempotent, fixed name)."""
     name = spec.container_name or f"fin_{spec.service}"
     site = "-"
-    labels = base_labels(fin_type=fin_type, service=spec.service, site=site, project="-")
+    labels = base_labels(
+        fin_type=fin_type,
+        service=spec.service,
+        site=site, project="-"
+    )
     if spec.web_exposed and spec.web_port:
         # Asset web UIs (e.g. a proxy dashboard) may route via a fixed host.
         host = spec.environment.get("FIN_ASSET_SITE", f"{spec.service}.localhost")

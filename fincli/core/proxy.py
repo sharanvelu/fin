@@ -60,5 +60,5 @@ def ensure_proxy() -> Any:
             command=_PROXY_COMMAND,
         )
     if result.created:
-        success("Started [bold]fin_proxy[/bold] [dim](traefik) — dashboard at http://traefik.localhost[/dim]")
+        success("Started [bold]fin_proxy[/bold] [dim](traefik)[/dim]")
     return result.container

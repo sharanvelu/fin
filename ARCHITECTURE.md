@@ -20,34 +20,34 @@ Dependencies point **downward**. Two invariants hold the whole system together:
    Plugs never touch Docker — they only describe what they need.
 
 ```
-        ┌─────────────────────────────────────────────────────────┐
-        │  fincli/__main__.py        entrypoint + argv dispatch     │
+        ┌────────────────────────────────────────────────────────────┐
+        │  fincli/__main__.py        entrypoint + argv dispatch      │
         │  fincli/resolver.py        reserved → APP → PLUGS → GLOBAL │
         │  fincli/help.py            overview + per-command help     │
-        └─────────────────────────────────────────────────────────┘
+        └────────────────────────────────────────────────────────────┘
                      │                              │
                      ▼                              ▼
-        ┌───────────────────────┐      ┌──────────────────────────┐
-        │  fincli/commands       │      │  fincli/plugs             │
-        │  reserved system cmds  │      │  base · loader · registry │
-        │  up · down · stop · ps │      │  context                  │
-        │  exec · logs · images  │      │  (declarative plug API)   │
-        │  config · asset · plugs│      └──────────────────────────┘
-        └───────────────────────┘                  │
+        ┌────────────────────────┐      ┌────────────────────────────┐
+        │  fincli/commands       │      │  fincli/plugs              │
+        │  reserved system cmds  │      │  base · loader · registry  │
+        │  up · down · stop · ps │      │  context                   │
+        │  exec · logs · images  │      │  (declarative plug API)    │
+        │  config · asset · plugs│      └────────────────────────────┘
+        └────────────────────────┘                  │
                      │            ┌─────────────────┘
                      ▼            ▼
-        ┌─────────────────────────────────────────────────────────┐
-        │  fincli/core                                              │
-        │  orchestrator  proxy  database  containers  interactive   │
-        │  env  store  wait  docker_client (singleton)  errors      │
-        └─────────────────────────────────────────────────────────┘
+        ┌────────────────────────────────────────────────────────────┐
+        │  fincli/core                                               │
+        │  orchestrator  proxy  database  containers  interactive    │
+        │  env  store  wait  docker_client (singleton)  errors       │
+        └────────────────────────────────────────────────────────────┘
                      │                              │
                      ▼                              ▼
-        ┌───────────────────────┐      ┌──────────────────────────┐
-        │  fincli/ui             │      │  Docker SDK (docker-py)   │
-        │  console · tables ·    │      │  + Traefik proxy          │
-        │  spinners (ONLY printer)│     └──────────────────────────┘
-        └───────────────────────┘
+        ┌─────────────────────────┐      ┌───────────────────────────┐
+        │  fincli/ui              │      │  Docker SDK (docker-py)   │
+        │  console · tables ·     │      │  + Traefik proxy          │
+        │  spinners (ONLY printer)│      └───────────────────────────┘
+        └─────────────────────────┘
 
         fincli/app.py    tool identity (singleton) + exit codes (0/1/2)
         fincli/config.py system configuration (paths, labels, network, creds)
