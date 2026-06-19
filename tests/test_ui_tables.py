@@ -199,12 +199,32 @@ def test_grouped_global_type_goes_to_other():
     assert [h for h, _ in sections] == ["Other Containers"]
 
 
-def test_grouped_table_has_state_and_status_columns():
+def test_grouped_table_default_omits_stats_columns():
+    # Without stats, CPU%/Mem columns are not shown (they're only collected and
+    # displayed with `fin ps -s`).
     app = _typed("app", name="myapp-web", id="app000000001")
     _, table = make_grouped_container_tables([app])[0]
     headers = [col.header for col in table.columns]
+    assert headers == ["ID", "Name", "Service", "Site", "State", "Status", "Ports"]
+    assert "CPU%" not in headers and "Mem" not in headers
+
+
+def test_grouped_table_with_stats_includes_stats_columns():
+    app = _typed("app", name="myapp-web", id="app000000001", status="running")
+    _, table = make_grouped_container_tables(
+        [app], stats={app.id: {"cpu": "1.0", "mem": "5MB"}}
+    )[0]
+    headers = [col.header for col in table.columns]
     assert headers == ["ID", "Name", "Service", "Site", "State", "Status",
                        "Ports", "CPU%", "Mem"]
+
+
+def test_grouped_table_empty_stats_dict_still_shows_columns():
+    # `-s` with stopped containers → empty dict, but columns still appear ("-").
+    app = _typed("app", name="myapp-web", id="app000000001", status="exited")
+    _, table = make_grouped_container_tables([app], stats={})[0]
+    headers = [col.header for col in table.columns]
+    assert "CPU%" in headers and "Mem" in headers
 
 
 def test_grouped_table_uses_service_and_site_labels():

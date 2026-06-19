@@ -166,6 +166,8 @@ def _section_key(container: Any) -> str:
 
 
 #: Single source of truth for the grouped-table columns: (header, column kwargs).
+#: The trailing two (CPU%, Mem) are *stats* columns, shown only when stats were
+#: requested (``fin ps -s``); see :func:`_columns`.
 _COLUMN_DEFS: tuple[tuple[str, dict[str, Any]], ...] = (
     ("ID", {"style": "dim", "no_wrap": True}),
     ("Name", {"style": "bold"}),
@@ -177,6 +179,20 @@ _COLUMN_DEFS: tuple[tuple[str, dict[str, Any]], ...] = (
     ("CPU%", {"justify": "right"}),
     ("Mem", {"justify": "right"}),
 )
+
+#: Number of leading non-stats columns (ID … Ports). CPU%/Mem are the trailing
+#: stats columns and are only rendered when stats were collected.
+_BASE_COLUMN_COUNT = 7
+
+
+def _show_stats(stats: dict[str, dict[str, str]] | None) -> bool:
+    """Whether to include the CPU%/Mem columns. None → omit; a dict → show."""
+    return stats is not None
+
+
+def _columns(show_stats: bool) -> tuple[tuple[str, dict[str, Any]], ...]:
+    """The column defs to render, dropping the stats columns when not shown."""
+    return _COLUMN_DEFS if show_stats else _COLUMN_DEFS[:_BASE_COLUMN_COUNT]
 
 
 def _row_plain(container: Any, stats: dict[str, dict[str, str]] | None) -> list[str]:
@@ -215,11 +231,13 @@ def _shared_column_widths(
 
     Applying one width per column to every section makes the grouped tables
     render with identical column — and therefore overall — widths, so they
-    line up exactly.
+    line up exactly. Only the columns actually being shown are measured.
     """
-    widths = [len(header) for header, _ in _COLUMN_DEFS]
+    cols = _columns(_show_stats(stats))
+    widths = [len(header) for header, _ in cols]
     for c in containers:
-        for i, value in enumerate(_row_plain(c, stats)):
+        values = _row_plain(c, stats)[: len(cols)]
+        for i, value in enumerate(values):
             widths[i] = max(widths[i], len(str(value)))
     return widths
 
@@ -278,15 +296,16 @@ def _build_container_table(
     *widths* is given, each column is pinned to that width so multiple section
     tables align; otherwise columns auto-size to their own content.
     """
+    cols = _columns(_show_stats(stats))
     table = Table(header_style="bold cyan", expand=False)
-    for i, (header, opts) in enumerate(_COLUMN_DEFS):
+    for i, (header, opts) in enumerate(cols):
         col_opts = dict(opts)
         if widths is not None:
             col_opts["width"] = widths[i]
         table.add_column(header, **col_opts)
 
     for c in containers:
-        values = _row_plain(c, stats)
+        values = _row_plain(c, stats)[: len(cols)]
         style = status_style(getattr(c, "status", "") or "")
         # Colour the State cell (index 4) without changing its visible width.
         values[4] = f"[{style}]{values[4]}[/{style}]"

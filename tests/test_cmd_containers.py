@@ -61,6 +61,50 @@ def test_ps_all_flag(monkeypatch):
     assert captured["all_"] is True
 
 
+def _capture_ps_stats(monkeypatch, args):
+    """Run ps(args) and return the `stats` kwarg passed to the renderer, plus
+    whether _read_stats was called."""
+    c = make_fake_container(name="demo-web", status="running")
+    monkeypatch.setattr(cc, "list_containers", lambda **kw: [c])
+    state = {"read_stats_called": False}
+
+    def fake_read_stats(containers):
+        state["read_stats_called"] = True
+        return {"x": {"cpu": "1.0", "mem": "2MB"}}
+
+    monkeypatch.setattr(cc, "_read_stats", fake_read_stats)
+
+    def fake_render(containers, **kwargs):
+        state["stats"] = kwargs.get("stats")
+        return "GROUP"
+
+    monkeypatch.setattr(cc, "render_grouped_containers", fake_render)
+    assert cc.ps(args) == EXIT_OK
+    return state
+
+
+def test_ps_without_stats_flag_does_not_collect_stats(monkeypatch):
+    state = _capture_ps_stats(monkeypatch, [])
+    assert state["read_stats_called"] is False
+    assert state["stats"] is None  # → renderer omits CPU%/Mem columns
+
+
+@pytest.mark.parametrize("flag", ["-s", "--stats"])
+def test_ps_stats_flag_collects_stats(monkeypatch, flag):
+    state = _capture_ps_stats(monkeypatch, [flag])
+    assert state["read_stats_called"] is True
+    assert state["stats"] == {"x": {"cpu": "1.0", "mem": "2MB"}}
+
+
+def test_ps_stats_and_all_flags_combine(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(cc, "list_containers", lambda **kw: captured.update(kw) or [])
+    monkeypatch.setattr(cc, "_read_stats", lambda containers: {})
+    monkeypatch.setattr(cc, "render_grouped_containers", lambda *a, **k: "GROUP")
+    cc.ps(["-a", "-s"])
+    assert captured["all_"] is True
+
+
 def test_read_stats_skips_non_running(monkeypatch):
     running = make_fake_container(name="r", status="running", id="run111111111")
     running.stats.return_value = {

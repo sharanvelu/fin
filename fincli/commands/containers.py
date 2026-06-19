@@ -59,21 +59,33 @@ def _mem_usage(s: dict) -> str:
 
 @reserved(
     "ps",
-    help="List running Fin containers (-a for all).",
+    help="List Fin containers (-a for all, -s for CPU/Mem stats).",
     aliases=("status", "containers"),
     group="Containers",
-    usage="fin ps [-a]",
-    options=(("-a, --all", "Include stopped containers, not just running ones."),),
-    examples=("fin ps", "fin ps -a"),
+    usage="fin ps [-a] [-s]",
+    options=(
+        ("-a, --all", "Include stopped containers, not just running ones."),
+        ("-s, --stats", "Collect and show live CPU% and Mem."),
+    ),
+    examples=("fin ps", "fin ps -a", "fin ps -s"),
 )
 def ps(args: list[str]) -> int:
     show_all = "-a" in args or "--all" in args
-    with fin_spinner(f"Getting {'all' if show_all else 'running'} containers..."):
+    with_stats = "-s" in args or "--stats" in args
+    label = "all" if show_all else "running"
+    spinner_msg = (
+        f"Getting {label} containers (with stats)..."
+        if with_stats
+        else f"Getting {label} containers..."
+    )
+    with fin_spinner(spinner_msg):
         containers = list_containers(all_=show_all)
         if not containers:
             info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
             return EXIT_OK
-        stats = _read_stats(containers)
+        # Stats are only collected (and the CPU%/Mem columns only shown) when
+        # -s/--stats is given — the per-container stats call is slow.
+        stats = _read_stats(containers) if with_stats else None
         grouped_containers = render_grouped_containers(containers, stats=stats)
 
     console.print(grouped_containers)
