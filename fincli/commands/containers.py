@@ -73,9 +73,7 @@ def ps(args: list[str]) -> int:
         if not containers:
             info("No Fin containers." + ("" if show_all else " (try 'fin ps -a')"))
             return EXIT_OK
-        # Stats is disabled now. We can enable it later
-        # stats = _read_stats(containers)
-        stats = {}
+        stats = _read_stats(containers)
         grouped_containers = render_grouped_containers(containers, stats=stats)
 
     console.print(grouped_containers)
