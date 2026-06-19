@@ -174,8 +174,8 @@ _COLUMN_DEFS: tuple[tuple[str, dict[str, Any]], ...] = (
     ("State", {}),
     ("Status", {}),
     ("Ports", {}),
-    ("CPU%", {"justify": "right"}),
-    ("Mem", {"justify": "right"}),
+    # ("CPU%", {"justify": "right"}),
+    # ("Mem", {"justify": "right"}),
 )
 
 
@@ -203,8 +203,8 @@ def _row_plain(container: Any, stats: dict[str, dict[str, str]] | None) -> list[
         status.capitalize() or "-",
         uptime_status(container),
         _ports_to_str(container),
-        cpu,
-        mem,
+        # cpu,
+        # mem,
     ]
 
 

@@ -108,7 +108,7 @@ def test_laravel_migrate_subcommands(bundled_plugs, tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# Interactive contract: REPL/shell handlers attach stdin; one-shots do not.
+# Interactive contract.
 # --------------------------------------------------------------------------- #
 def test_laravel_tinker_is_interactive(bundled_plugs):
     lp = load_by_name("laravel")
@@ -126,9 +126,186 @@ def test_laravel_bash_is_interactive(bundled_plugs):
     assert ctx.calls[0]["interactive"] is True
 
 
-@pytest.mark.parametrize("name,args", [("artisan", ["list"]), ("migrate", [])])
+# artisan/composer wrappers run interactively so prompts (vendor:publish,
+# make:model, migrate's production guard, composer prompts, …) work. The
+# interactive path falls back to streaming when there's no TTY, so CI is fine.
+@pytest.mark.parametrize(
+    "name,args",
+    [
+        ("artisan", ["vendor:publish"]),
+        ("artisan", ["list"]),
+        ("composer", ["install"]),
+        ("migrate", []),
+        ("seed", []),
+        ("make", ["model", "Post"]),
+        ("queue", ["work"]),
+    ],
+)
+def test_laravel_artisan_wrappers_are_interactive(bundled_plugs, name, args):
+    lp = load_by_name("laravel")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds[name].handler(ctx, args)
+    assert ctx.calls[0]["interactive"] is True
+
+
+# Genuinely non-interactive helpers stay non-interactive (they still get colour
+# via the streamed TTY path, just no stdin attached).
+@pytest.mark.parametrize("name,args", [("phpunit", []), ("php", ["-v"])])
 def test_laravel_oneshot_handlers_not_interactive(bundled_plugs, name, args):
     lp = load_by_name("laravel")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds[name].handler(ctx, args)
+    assert ctx.calls[0]["interactive"] is False
+
+
+# --------------------------------------------------------------------------- #
+# Django app plug
+# --------------------------------------------------------------------------- #
+def test_django_loads(bundled_plugs):
+    lp = load_by_name("django")
+    assert lp is not None
+    assert lp.plug_type is PlugType.APP
+    assert lp.instance.name == "django"
+
+
+def test_django_env_spec(bundled_plugs):
+    lp = load_by_name("django")
+    spec = lp.instance.env_spec()
+    names = {v.name for v in spec.variables}
+    assert {"FIN_SITE", "FIN_PYTHON_VERSION", "FIN_DJANGO_PORT", "FIN_REQUIREMENTS"} <= names
+    site_var = next(v for v in spec.variables if v.name == "FIN_SITE")
+    assert site_var.required is True
+    py_var = next(v for v in spec.variables if v.name == "FIN_PYTHON_VERSION")
+    assert py_var.default == "3.12"
+
+
+def test_django_primary_spec(bundled_plugs, tmp_path):
+    lp = load_by_name("django")
+    spec = lp.instance.primary_spec(_env(tmp_path, FIN_SITE="app.localhost"))
+    assert spec.service == "web"
+    assert spec.image == "python:3.12-slim"  # default
+    assert spec.web_exposed is True
+    assert spec.web_port == 8000
+    assert spec.workdir_mount == "/app"
+    assert spec.extra.get("working_dir") == "/app"
+    # autoreloading dev server + dependency install on start
+    joined = " ".join(spec.command)
+    assert "manage.py runserver 0.0.0.0:8000" in joined
+    assert "pip install --prefer-binary -r" in joined
+    # warm pip cache volume
+    assert any(v.host == "fin_pip_cache" for v in spec.volumes)
+    # live-output env
+    assert spec.environment.get("PYTHONUNBUFFERED") == "1"
+
+
+def test_django_apt_packages_opt_in(bundled_plugs, tmp_path):
+    lp = load_by_name("django")
+    # Default: no apt step in the startup command.
+    spec = lp.instance.primary_spec(_env(tmp_path, FIN_SITE="x.localhost"))
+    assert "apt-get install" not in " ".join(spec.command)
+    assert spec.environment.get("FIN_APT_PACKAGES") == ""
+
+    # Opt-in: apt-install runs before pip and the packages reach the container env.
+    spec2 = lp.instance.primary_spec(
+        _env(tmp_path, FIN_SITE="x.localhost", FIN_APT_PACKAGES="build-essential libpq-dev")
+    )
+    joined = " ".join(spec2.command)
+    assert "apt-get install" in joined
+    assert joined.index("apt-get install") < joined.index("pip install")  # apt before pip
+    assert spec2.environment["FIN_APT_PACKAGES"] == "build-essential libpq-dev"
+
+
+def test_django_primary_spec_custom_version_and_port(bundled_plugs, tmp_path):
+    lp = load_by_name("django")
+    spec = lp.instance.primary_spec(
+        _env(tmp_path, FIN_SITE="x.localhost", FIN_PYTHON_VERSION="3.11", FIN_DJANGO_PORT="9000")
+    )
+    assert spec.image == "python:3.11-slim"
+    assert spec.web_port == 9000
+    assert "runserver 0.0.0.0:9000" in " ".join(spec.command)
+
+
+def test_django_primary_spec_custom_image_and_bad_port(bundled_plugs, tmp_path):
+    lp = load_by_name("django")
+    spec = lp.instance.primary_spec(
+        _env(tmp_path, FIN_DOCKER_IMAGE="myorg/django:dev", FIN_DJANGO_PORT="not-a-number")
+    )
+    assert spec.image == "myorg/django:dev"
+    assert spec.web_port == 8000  # falls back safely
+
+
+def test_django_forwards_project_env_strips_control_vars(bundled_plugs, tmp_path):
+    lp = load_by_name("django")
+    spec = lp.instance.primary_spec(_env(
+        tmp_path,
+        FIN_SITE="x.localhost",            # control var → must NOT be forwarded
+        FIN_PYTHON_VERSION="3.11",         # control var → must NOT be forwarded
+        DJANGO_MYSQL_HOST="fin_mysql",     # app var → must be forwarded
+        SECRET_KEY="s3cret",               # app var → must be forwarded
+    ))
+    env = spec.environment
+    assert env["DJANGO_MYSQL_HOST"] == "fin_mysql"
+    assert env["SECRET_KEY"] == "s3cret"
+    assert "FIN_SITE" not in env
+    assert "FIN_PYTHON_VERSION" not in env
+    # plug runtime vars still set
+    assert env["PYTHONUNBUFFERED"] == "1"
+
+
+def test_django_commands(bundled_plugs):
+    lp = load_by_name("django")
+    cmds = lp.instance.commands()
+    for name in ("manage", "migrate", "makemigrations", "shell", "createsuperuser",
+                 "collectstatic", "test", "startapp", "pip", "python", "bash"):
+        assert name in cmds
+    assert "mm" in cmds["makemigrations"].aliases
+    assert "csu" in cmds["createsuperuser"].aliases
+    assert "py" in cmds["python"].aliases
+
+
+def test_django_manage_passthrough(bundled_plugs):
+    lp = load_by_name("django")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds["manage"].handler(ctx, ["migrate", "--noinput"])
+    assert ctx.calls[0]["cmd"] == ["python", "manage.py", "migrate", "--noinput"]
+    assert ctx.calls[0]["workdir"] == "/app"
+    assert ctx.calls[0]["interactive"] is False
+
+
+@pytest.mark.parametrize("name", ["shell", "dbshell", "createsuperuser", "bash"])
+def test_django_interactive_handlers(bundled_plugs, name):
+    lp = load_by_name("django")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds[name].handler(ctx, [])
+    assert ctx.calls[0]["interactive"] is True
+
+
+def test_django_manage_interactive_for_prompting_subcommands(bundled_plugs):
+    lp = load_by_name("django")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds["manage"].handler(ctx, ["createsuperuser"])
+    assert ctx.calls[0]["interactive"] is True
+
+
+def test_django_python_repl_is_interactive_with_no_args(bundled_plugs):
+    lp = load_by_name("django")
+    cmds = lp.instance.commands()
+    ctx = FakeCtx()
+    cmds["python"].handler(ctx, [])           # REPL → interactive
+    assert ctx.calls[0]["interactive"] is True
+    ctx2 = FakeCtx()
+    cmds["python"].handler(ctx2, ["-c", "print(1)"])  # one-shot → not
+    assert ctx2.calls[0]["interactive"] is False
+
+
+@pytest.mark.parametrize("name,args", [("migrate", []), ("collectstatic", []), ("test", [])])
+def test_django_oneshot_handlers_not_interactive(bundled_plugs, name, args):
+    lp = load_by_name("django")
     cmds = lp.instance.commands()
     ctx = FakeCtx()
     cmds[name].handler(ctx, args)
