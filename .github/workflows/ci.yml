@@ -6,8 +6,6 @@ name: ci
 # rule to block merges when tests fail.
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
     branches: [master]
 
