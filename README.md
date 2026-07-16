@@ -148,8 +148,14 @@ fin down all        # everything Fin manages
 ```
 
 > The shared asset containers connect on their service hostnames: `DB_HOST=fin_mysql`,
-> `REDIS_HOST=fin_redis`, `fin_postgres`. Default credentials are `fin` / `password`
-> (override with `FIN_ASSET_USERNAME` / `FIN_ASSET_PASSWORD`).
+> `REDIS_HOST=fin_redis`, `fin_postgres`. Credentials are fixed at `fin` / `password`,
+> shared across every project on the machine.
+
+> **Custom CA certificates.** Drop `.pem`/`.crt` files into `~/.fin/certs` and Fin
+> installs them into opted-in app containers on every `fin up` — each cert is copied
+> into the container's trust store and registered with `update-ca-certificates`. Opt
+> in per plug with `ContainerSpec(install_certs=True)`; the bundled Laravel plug
+> already does. Non-Debian images override `cert_dir` / `cert_update_cmd`.
 
 ## Command reference
 
@@ -253,17 +259,17 @@ Process environment variables take precedence over the `.env` file, so
 
 | Variable | Meaning | Default |
 | -------- | ------- | ------- |
-| `FIN_NETWORK` | The Docker network all Fin containers join. | `fin` |
 | `FIN_ROOT` | Root of the installed Fin source tree (set by the launcher). | the package dir |
-| `FIN_DATA_DIR` | Per-user data dir (config, registry). | `~/.fin` |
+| `FIN_DATA_DIR` | Per-user data dir (config, registry, certs). | `~/.fin` |
 | `FIN_PLUGS_DIR` | Directory holding plugs, grouped into `App/`, `Asset/`, `Global/`. | bundled `./plugs` |
-| `FIN_REGISTRY_DB` | SQLite plug-metadata cache. | `~/.fin/registry.db` |
-| `FIN_CONFIG_FILE` | Persisted asset enable/disable flags. | `~/.fin/config.json` |
-| `FIN_ASSET_USERNAME` / `FIN_ASSET_PASSWORD` | Credentials baked into shared asset containers. | `fin` / `password` |
-| `FIN_ASSET_DEFAULT_DATABASE` | Default DB created in asset engines. | `fin` |
 | `FIN_PROXY_IMAGE` | Traefik image for the proxy. | `traefik:v3.6` |
 | `FIN_PYTHON` | Force a specific Python interpreter for the launcher. | auto-detected |
 | `DOCKER_HOST` | If set, Fin defers to the Docker SDK's own socket handling. | unset |
+
+> Fixed (not environment-configurable): the network name (`fin`), the registry and
+> config paths (`~/.fin/registry.db`, `~/.fin/config.json`), the certs directory
+> (`~/.fin/certs`), and the shared-asset credentials (`fin` / `password`, database
+> `fin`).
 
 ## How it works
 
@@ -437,6 +443,11 @@ Key points:
 - **`env_spec()`** declares required/optional vars, `choices`, types, and
   defaults; `EnvSpec.validate(env)` raises one friendly error listing every
   problem.
+- **CA certificates.** Set `install_certs=True` on a `ContainerSpec` and Fin
+  installs `~/.fin/certs/*.{pem,crt}` into that container's trust store on every
+  `fin up`. Defaults target Debian (`/usr/local/share/ca-certificates` +
+  `update-ca-certificates`); override `cert_dir` / `cert_update_cmd` for other
+  bases.
 
 After adding a plug, `fin plugs list` re-scans the directory and refreshes the
 SQLite registry automatically.

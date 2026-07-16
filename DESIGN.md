@@ -66,9 +66,13 @@ place that mutates the Docker daemon.
   `EXIT_SYSTEM=2`.
 - **`fincli/config.py`** — `Config`, the central holder of *system*
   configuration: the network name, filesystem paths (`DATA_DIR`, `PLUGS_DIR`,
-  `REGISTRY_DB`, `CONFIG_FILE`), shared asset credentials, label keys, and proxy
-  settings. Paths are read from environment variables at class-definition time
-  (so tests `monkeypatch` the attributes, not the env).
+  `REGISTRY_DB`, `CONFIG_FILE`, `certs_dir()`), shared asset credentials, label
+  keys, and proxy settings. Only a few values read the environment at
+  class-definition time — `FIN_ROOT`, `FIN_DATA_DIR`, `FIN_PLUGS_DIR`, and
+  `FIN_PROXY_IMAGE`. The rest are fixed: the network name (`fin`), the
+  `DATA_DIR`-relative `REGISTRY_DB` / `CONFIG_FILE` / `certs_dir()`, and the
+  shared-asset credentials (`fin` / `password`). Tests `monkeypatch` the
+  attributes, not the env.
 
 ### Core (`fincli/core`)
 
@@ -88,6 +92,10 @@ place that mutates the Docker daemon.
 - **`proxy.py`** — starts/ensures the built-in Traefik proxy (not a plug).
 - **`database.py`** — auto-creates the project's `DB_DATABASE` inside the shared
   MySQL/Postgres asset container via `exec_run` (no host DB client needed).
+- **`certs.py`** — installs the user's CA certs from `~/.fin/certs` into any
+  container whose `ContainerSpec` opted in (`install_certs`), via `put_archive`
+  plus the distro's trust-store refresh command. Best-effort: it never fails
+  `fin up`.
 - **`store.py`** — tiny JSON store at `~/.fin/config.json` tracking which assets
   auto-start.
 - **`errors.py`** — `FinError` hierarchy and the `@handle_errors` decorator that
@@ -161,6 +169,7 @@ fin up
  │     └─ persisted enabled assets ∪ assets named in FIN_PLUGS
  ├─ spec = plug.primary_spec(env)             # the ContainerSpec to run
  ├─ start_primary(spec, env)                  # labels + Traefik + cwd bind-mount + run
+ │     └─ install_certs(container, spec)      # if spec.install_certs: copy ~/.fin/certs + refresh trust store
  ├─ ensure_project_database(env)              # CREATE DATABASE in shared engine if missing
  └─ success("<project> is up at http://<FIN_SITE>")
 ```
@@ -174,6 +183,12 @@ recreated.
 
 `start_asset` is the shared-container variant: fixed name (`fin_<service>` or the
 spec's `container_name`), `FIN_TYPE=asset`, `FIN_PROJECT=-`.
+
+When a spec sets `install_certs`, both `start_primary` and `start_asset` then call
+`install_certs(container, spec)` (`core/certs.py`): it tars any
+`~/.fin/certs/*.{pem,crt}`, `put_archive`s them into the spec's `cert_dir`, and
+runs `cert_update_cmd` — Debian defaults, overridable per plug. It runs on every
+`fin up` (idempotent) and is best-effort, so a cert problem never fails the up.
 
 ## 5. Command resolution algorithm
 

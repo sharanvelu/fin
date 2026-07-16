@@ -28,6 +28,7 @@ fincli/
     orchestrator.py       ContainerSpec → running container (the ONLY Docker mutator)
     proxy.py              built-in traefik:v3.6 (fin_proxy)
     database.py           auto-create DB_DATABASE in shared engine
+    certs.py              install ~/.fin/certs into opted-in containers
     store.py              ~/.fin/config.json asset enable flags
     errors.py             FinError + @handle_errors decorator
   ui/                     console, tables, spinners — the ONLY place that prints
@@ -37,7 +38,7 @@ fincli/
     registry.py           SQLite cache (~/.fin/registry.db) + `fin plugs` ops
     context.py            PlugContext.exec(...) inside primary container
   commands/               reserved system commands (@reserved decorator)
-plugs/                    bundled plugs (gitignored): App/laravel, Asset/{mysql,redis,postgres}
+plugs/                    bundled plugs (gitignored): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
 tests/                    pytest suite + conftest fixtures
 ```
 
@@ -93,7 +94,10 @@ when it's a core Fin capability. To add a plug:
    `container_name`. Add `commands()` returning `{name: PlugCommand(...)}`.
 3. Declare requirements with `env_spec()` (see below). Handlers take
    `(ctx: PlugContext, args)` and call `ctx.exec([...], workdir=...)`.
-4. `fin plugs list` re-syncs the SQLite registry from disk. See
+4. To trust the user's CA certs (`~/.fin/certs`), set `install_certs=True` on the
+   `ContainerSpec` (Debian defaults; override `cert_dir` / `cert_update_cmd` for
+   other bases). The orchestrator installs them on every `fin up`.
+5. `fin plugs list` re-syncs the SQLite registry from disk. See
    `plugs/App/laravel/__init__.py` and `plugs/Asset/mysql/__init__.py` for full
    examples.
 
