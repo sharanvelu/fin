@@ -38,9 +38,14 @@ fincli/
     registry.py           SQLite cache (~/.fin/registry.db) + `fin plugs` ops
     context.py            PlugContext.exec(...) inside primary container
   commands/               reserved system commands (@reserved decorator)
-plugs/                    bundled plugs (gitignored): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
+plugs/                    plug source (gitignored, separate repo): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
 tests/                    pytest suite + conftest fixtures
 ```
+
+At runtime plugs load from `PLUGS_DIR`, which is fixed at `~/.fin/plugs` (it moves
+with `FIN_DATA_DIR`) — *not* the repo's `plugs/`. For development, symlink the repo
+tree there once: `ln -s "$PWD/plugs" ~/.fin/plugs`. (This keeps the tool binary/
+install immutable while plugs live in the writable user data dir.)
 
 ## Conventions (do not violate)
 

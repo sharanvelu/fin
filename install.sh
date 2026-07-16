@@ -118,4 +118,4 @@ esac
 
 echo
 ok  "Fin installed. Run: ${c_cyan}fin --help${c_reset}"
-info "Project plugs live in: $FIN_HOME_DIR/plugs (configurable in fincli/config.py)"
+info "Install plugs into: $HOME/.fin/plugs (grouped App/ Asset/ Global/)"

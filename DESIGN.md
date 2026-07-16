@@ -67,12 +67,12 @@ place that mutates the Docker daemon.
 - **`fincli/config.py`** — `Config`, the central holder of *system*
   configuration: the network name, filesystem paths (`DATA_DIR`, `PLUGS_DIR`,
   `REGISTRY_DB`, `CONFIG_FILE`, `certs_dir()`), shared asset credentials, label
-  keys, and proxy settings. Only a few values read the environment at
-  class-definition time — `FIN_ROOT`, `FIN_DATA_DIR`, `FIN_PLUGS_DIR`, and
-  `FIN_PROXY_IMAGE`. The rest are fixed: the network name (`fin`), the
-  `DATA_DIR`-relative `REGISTRY_DB` / `CONFIG_FILE` / `certs_dir()`, and the
-  shared-asset credentials (`fin` / `password`). Tests `monkeypatch` the
-  attributes, not the env.
+  keys, and proxy settings. Only two values read the environment at
+  class-definition time — `FIN_DATA_DIR` and `FIN_PROXY_IMAGE`. The rest are
+  fixed: the network name (`fin`), the `DATA_DIR`-relative `PLUGS_DIR` /
+  `REGISTRY_DB` / `CONFIG_FILE` / `certs_dir()` (so they all move with
+  `FIN_DATA_DIR`), and the shared-asset credentials (`fin` / `password`). Tests
+  `monkeypatch` the attributes, not the env.
 
 ### Core (`fincli/core`)
 

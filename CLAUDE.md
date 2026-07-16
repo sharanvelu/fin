@@ -28,6 +28,7 @@ touch Docker themselves — Fin's orchestrator does that on their behalf.
 
 ```bash
 python3 -m pip install --user typer rich docker   # runtime deps (no venv)
+ln -s "$PWD/plugs" ~/.fin/plugs                   # dev: plugs load from ~/.fin/plugs (PLUGS_DIR)
 python3 -m pytest                                 # run the test suite
 python3 -m fincli --help                          # run the CLI from source
 fin up                                            # in a project dir with a FIN_* .env

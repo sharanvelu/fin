@@ -259,17 +259,15 @@ Process environment variables take precedence over the `.env` file, so
 
 | Variable | Meaning | Default |
 | -------- | ------- | ------- |
-| `FIN_ROOT` | Root of the installed Fin source tree (set by the launcher). | the package dir |
-| `FIN_DATA_DIR` | Per-user data dir (config, registry, certs). | `~/.fin` |
-| `FIN_PLUGS_DIR` | Directory holding plugs, grouped into `App/`, `Asset/`, `Global/`. | bundled `./plugs` |
+| `FIN_DATA_DIR` | Per-user data dir (config, registry, certs, plugs). | `~/.fin` |
 | `FIN_PROXY_IMAGE` | Traefik image for the proxy. | `traefik:v3.6` |
 | `FIN_PYTHON` | Force a specific Python interpreter for the launcher. | auto-detected |
 | `DOCKER_HOST` | If set, Fin defers to the Docker SDK's own socket handling. | unset |
 
-> Fixed (not environment-configurable): the network name (`fin`), the registry and
-> config paths (`~/.fin/registry.db`, `~/.fin/config.json`), the certs directory
-> (`~/.fin/certs`), and the shared-asset credentials (`fin` / `password`, database
-> `fin`).
+> Fixed (not environment-configurable): the network name (`fin`); the registry,
+> config, certs, and plugs locations under `~/.fin` (`registry.db`, `config.json`,
+> `certs/`, `plugs/`); and the shared-asset credentials (`fin` / `password`,
+> database `fin`). Those `~/.fin` paths all move together when `FIN_DATA_DIR` is set.
 
 ## How it works
 
@@ -338,10 +336,10 @@ A plug is a Python package under the plugs directory, grouped by type:
   Global/<name>/__init__.py   # PlugType.GLOBAL
 ```
 
-`PLUGS_DIR` defaults to the bundled `./plugs` directory and is configurable via
-`FIN_PLUGS_DIR`. The loader imports each package, finds the single class that
-subclasses `FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and
-calls `setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
+`PLUGS_DIR` is fixed at `~/.fin/plugs` (it moves with `FIN_DATA_DIR`). The loader
+imports each package by file path, finds the single class that subclasses
+`FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and calls
+`setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
 
 **Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
 objects and asks `PlugContext` to exec inside a running container — it must never
@@ -464,7 +462,7 @@ and exits with code `2`.
 (or `FIN_PLUG`) set in the project's `.env`.
 
 **"App plug '<name>' is not installed."** — Check `fin plugs list`; ensure the
-plug exists under `App/<name>` in your `PLUGS_DIR` (or `FIN_PLUGS_DIR`).
+plug exists under `App/<name>` in your plugs dir (`~/.fin/plugs`).
 
 **The `fin` command isn't found** — the installer warns if its chosen bin
 directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PATH"`.

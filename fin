@@ -18,7 +18,6 @@ while [ -h "$SOURCE" ]; do
   [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 FIN_ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
-export FIN_ROOT
 
 # --- Locate a suitable Python interpreter (3.11+) ---------------------------
 PYTHON_BIN="${FIN_PYTHON:-}"
