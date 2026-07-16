@@ -1,15 +1,19 @@
-name: release
+name: build & release
 
-# Build the standalone `fin` binary (PyInstaller onedir) for each OS/arch and
-# attach the tarballs to the GitHub Release. PyInstaller cannot cross-compile,
-# so each artifact is built on its own native runner.
+# Build the standalone `fin` binary (PyInstaller onedir) for each OS/arch.
+# PyInstaller cannot cross-compile, so each artifact is built on its own native
+# runner. Tests are NOT run here — they gate the merge via ci.yml + the branch
+# rule, so anything reaching master has already passed.
 #
 # Triggers:
-#   - pushing a tag like v0.1.0  → builds + publishes to that release
-#   - manual run (workflow_dispatch) → builds + uploads as workflow artifacts
+#   - push to master (i.e. a PR merged in) → build + upload workflow artifacts
+#     (validates that the release binary still compiles on every merge)
+#   - pushing a tag like v0.1.0            → build + attach the tarballs to the Release
+#   - manual run (workflow_dispatch)       → build + upload workflow artifacts
 
 on:
   push:
+    branches: [master]
     tags: ["v*"]
   workflow_dispatch:
 
