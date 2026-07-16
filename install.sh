@@ -65,8 +65,11 @@ esac
 ARTIFACT="fin-${OS}-${ARCH}.tar.gz"
 
 # --- resolve the download URL -----------------------------------------------
+# "latest" = the rolling prerelease refreshed on every master merge; its tag is
+# literally `latest`. GitHub's /releases/latest/ redirect skips prereleases, so
+# address the tag directly. A specific version installs the immutable v* release.
 if [ "$FIN_VERSION" = "latest" ]; then
-  URL="https://github.com/${FIN_RELEASE_REPO}/releases/latest/download/${ARTIFACT}"
+  URL="https://github.com/${FIN_RELEASE_REPO}/releases/download/latest/${ARTIFACT}"
 else
   URL="https://github.com/${FIN_RELEASE_REPO}/releases/download/v${FIN_VERSION}/${ARTIFACT}"
 fi
