@@ -302,9 +302,14 @@ bullet, so a misconfigured `.env` is fixed in a single pass.
 - **Singletons for `DockerService`, `App`, `Config`.** One client, one identity,
   one config — natural for a CLI. *Trade-off:* tests must reset the
   `DockerService` singleton between cases (handled by an autouse fixture).
-- **No virtualenv.** A `--user` pip install plus a `PYTHONPATH`-setting launcher
-  keeps install friction minimal and matches DockR's "just works" feel.
-  *Trade-off:* relies on the system interpreter and user-site packages.
+- **Ship a standalone binary; keep source dev friction low.** End users install a
+  prebuilt PyInstaller **onedir** binary (see §10) that embeds its own interpreter
+  — no Python, pip, or virtualenv on the host, matching DockR's "just works" feel.
+  Developers still run the source directly against system Python 3.11+ with a
+  `--user` pip install and the `PYTHONPATH`-setting `fin` launcher (no virtualenv).
+  *Trade-off:* binaries must be built per OS/arch (PyInstaller can't
+  cross-compile), and an unsigned macOS binary needs a quarantine-strip until it
+  is notarized.
 - **Shared, fixed-name assets.** One `fin_mysql`/`fin_redis`/`fin_postgres`
   across all projects mirrors DockR and avoids N database servers. *Trade-off:*
   projects share an engine (isolated by database, not by container).
@@ -312,3 +317,31 @@ bullet, so a misconfigured `.env` is fixed in a single pass.
   up the filesystem as canonical state; the cache is rebuildable at any time.
 - **Graceful plug loading.** One broken plug warns and is skipped rather than
   taking down the whole CLI.
+
+## 10. Distribution and packaging
+
+Fin is delivered two ways, and a full install always has **two parts**: the
+`fin` binary on `PATH` and the plugs in `~/.fin/plugs`.
+
+- **Prebuilt binary (end users).** `packaging/build.sh` freezes the CLI with
+  PyInstaller in **onedir** mode against `packaging/fin_entry.py` (which calls
+  `fincli.__main__:main`), producing `dist/fin/` (a `fin` executable plus
+  `_internal/`) and a `fin-<os>-<arch>.tar.gz`. The binary embeds its own Python
+  interpreter and the whole `fincli` package, so the host needs **no Python** —
+  only Docker at runtime. Onedir is preferred over onefile for fast startup (no
+  per-run extraction). PyInstaller **cannot cross-compile**, so
+  `.github/workflows/release.yml` builds on a matrix of native runners
+  (`macos-14`/arm64, `macos-13`/x64, `ubuntu-latest`/x64, `ubuntu-24.04-arm`/arm64)
+  on `v*` tag pushes and attaches the tarballs to the GitHub Release.
+  `install.sh` detects OS/arch, downloads the matching tarball from
+  `sharanvelu/fin` Releases, unpacks it to `~/.fin-cli`, symlinks the launcher
+  onto `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
+  fix is notarization), and seeds plugs into `~/.fin/plugs`.
+- **From source (developers).** The `fin = fincli.__main__:main` console script in
+  `pyproject.toml` and the repo-root `fin` bash launcher both run the module
+  against system Python — no freezing step.
+
+**Plugs are never bundled.** They stay uncompiled `.py` under
+`~/.fin/plugs/{App,Asset,Global}` and are imported at runtime by the loader (§7),
+regardless of whether Fin itself is the binary or the source. `install.sh` seeds
+them by `git clone`-ing the plugs repo; developers symlink their checkout there.

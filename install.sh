@@ -1,28 +1,36 @@
 #!/usr/bin/env bash
 #
-# Fin installer.
+# Fin installer — installs a prebuilt, standalone `fin` binary.
+#
+# No Python, pip, or virtualenv is required on the host: the binary embeds its
+# own interpreter. Docker is still needed at runtime. Plugs are installed
+# separately into ~/.fin/plugs (this script seeds them from the fin-plugs repo).
 #
 # Usage:
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/<org>/<repo>/main/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/main/install.sh)"
 #
 # What it does:
-#   1. Verifies prerequisites (git, a Python 3.11+ interpreter).
-#   2. Clones (or updates) the Fin repo into ${FIN_HOME_DIR:-$HOME/.fin-cli}.
-#   3. Symlinks the `fin` launcher into the first writable PATH directory
-#      (/usr/local/bin, ~/.local/bin, ~/bin, ~/.bin ...).
-#   4. Installs Python dependencies (typer, rich, docker) for the user.
+#   1. Detects OS/arch and downloads the matching release tarball.
+#   2. Unpacks it to ${FIN_HOME_DIR:-$HOME/.fin-cli}.
+#   3. Symlinks the `fin` launcher into the first writable PATH directory.
+#   4. Seeds plugs into ~/.fin/plugs (clones fin-plugs if git is available).
 #
 # Configurable via environment variables:
-#   FIN_REPO_URL   git URL to clone           (default: the public Fin repo)
-#   FIN_USE_BRANCH branch/tag to check out    (default: main)
-#   FIN_HOME_DIR   install location           (default: $HOME/.fin-cli)
-#   FIN_BIN_DIR    where to place the symlink  (default: auto-detected)
+#   FIN_VERSION       release to install ("latest" or e.g. 0.1.0)  (default: latest)
+#   FIN_HOME_DIR      install location                             (default: $HOME/.fin-cli)
+#   FIN_BIN_DIR       where to place the `fin` symlink             (default: auto-detected)
+#   FIN_DATA_DIR      per-user data dir (config, registry, plugs)  (default: $HOME/.fin)
+#   FIN_RELEASE_REPO  GitHub repo hosting the releases             (default: sharanvelu/fin)
+#   FIN_PLUGS_REPO    git URL for the plugs repo                   (default: sharanvelu/fin-plugs)
 
 set -euo pipefail
 
-FIN_REPO_URL="${FIN_REPO_URL:-https://github.com/your-org/fin.git}"
-FIN_USE_BRANCH="${FIN_USE_BRANCH:-main}"
+FIN_VERSION="${FIN_VERSION:-latest}"
+FIN_VERSION="${FIN_VERSION#v}"   # tolerate a leading "v" (release tags are vX.Y.Z)
 FIN_HOME_DIR="${FIN_HOME_DIR:-$HOME/.fin-cli}"
+FIN_DATA_DIR="${FIN_DATA_DIR:-$HOME/.fin}"
+FIN_RELEASE_REPO="${FIN_RELEASE_REPO:-sharanvelu/fin}"
+FIN_PLUGS_REPO="${FIN_PLUGS_REPO:-https://github.com/sharanvelu/fin-plugs.git}"
 
 # --- pretty output ----------------------------------------------------------
 c_green=$'\033[0;32m'; c_red=$'\033[0;31m'; c_yellow=$'\033[0;33m'
@@ -33,70 +41,76 @@ warn()  { printf "%s⚠%s %s\n" "$c_yellow" "$c_reset" "$1"; }
 die()   { printf "%s✗%s %s\n" "$c_red"    "$c_reset" "$1" >&2; exit 1; }
 
 # --- prerequisites ----------------------------------------------------------
-command -v git >/dev/null 2>&1 || die "git is required but not installed."
-
-PYTHON_BIN=""
-for candidate in python3.13 python3.12 python3.11 python3 python; do
-  if command -v "$candidate" >/dev/null 2>&1; then
-    ver="$("$candidate" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "0.0")"
-    major="${ver%%.*}"; minor="${ver##*.}"
-    if [ "$major" -eq 3 ] && [ "$minor" -ge 11 ]; then
-      PYTHON_BIN="$candidate"; break
-    fi
-  fi
-done
-[ -n "$PYTHON_BIN" ] || die "Python 3.11+ is required but was not found."
-ok "Using Python: $($PYTHON_BIN --version 2>&1)"
-
-# --- clone or update --------------------------------------------------------
-if [ -d "$FIN_HOME_DIR/.git" ]; then
-  info "Updating existing install at $FIN_HOME_DIR"
-  git -C "$FIN_HOME_DIR" fetch --quiet origin "$FIN_USE_BRANCH"
-  git -C "$FIN_HOME_DIR" checkout --quiet "$FIN_USE_BRANCH"
-  git -C "$FIN_HOME_DIR" pull --quiet --ff-only origin "$FIN_USE_BRANCH" || warn "Could not fast-forward; continuing."
+# A downloader and tar are all we need (no Python).
+if command -v curl >/dev/null 2>&1; then
+  DL() { curl -fsSL "$1" -o "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+  DL() { wget -qO "$2" "$1"; }
 else
-  info "Cloning Fin into $FIN_HOME_DIR"
-  git clone --quiet --branch "$FIN_USE_BRANCH" "$FIN_REPO_URL" "$FIN_HOME_DIR" \
-    || die "git clone failed (repo: $FIN_REPO_URL, branch: $FIN_USE_BRANCH)."
+  die "Need curl or wget to download Fin."
 fi
-chmod +x "$FIN_HOME_DIR/fin"
-ok "Fin source ready."
+command -v tar >/dev/null 2>&1 || die "tar is required but not installed."
 
-# --- install python dependencies (user scope, no venv) ----------------------
-info "Installing Python dependencies (typer, rich, docker)…"
-if "$PYTHON_BIN" -m pip install --user --quiet --upgrade typer rich docker; then
-  ok "Dependencies installed."
+# --- detect OS/arch (must match packaging/build.sh labels) ------------------
+case "$(uname -s)" in
+  Darwin) OS=macos ;;
+  Linux)  OS=linux ;;
+  *) die "Unsupported OS: $(uname -s)" ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) ARCH=arm64 ;;
+  x86_64|amd64)  ARCH=x64 ;;
+  *) die "Unsupported architecture: $(uname -m)" ;;
+esac
+ARTIFACT="fin-${OS}-${ARCH}.tar.gz"
+
+# --- resolve the download URL -----------------------------------------------
+if [ "$FIN_VERSION" = "latest" ]; then
+  URL="https://github.com/${FIN_RELEASE_REPO}/releases/latest/download/${ARTIFACT}"
 else
-  warn "Could not install dependencies automatically. Run:"
-  warn "  $PYTHON_BIN -m pip install --user typer rich docker"
+  URL="https://github.com/${FIN_RELEASE_REPO}/releases/download/v${FIN_VERSION}/${ARTIFACT}"
 fi
+
+# --- download + unpack ------------------------------------------------------
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+info "Downloading $ARTIFACT ($FIN_VERSION)…"
+DL "$URL" "$TMP/$ARTIFACT" || die "Download failed: $URL"
+
+info "Installing into $FIN_HOME_DIR"
+mkdir -p "$FIN_HOME_DIR"
+rm -rf "$FIN_HOME_DIR/fin"                 # clean previous install (idempotent)
+tar -C "$FIN_HOME_DIR" -xzf "$TMP/$ARTIFACT"
+[ -x "$FIN_HOME_DIR/fin/fin" ] || die "Unexpected archive layout (missing fin/fin)."
+
+# macOS: strip the quarantine flag so the unsigned binary runs without a
+# Gatekeeper prompt. (The proper fix for a public release is notarization.)
+if [ "$OS" = "macos" ]; then
+  xattr -dr com.apple.quarantine "$FIN_HOME_DIR/fin" 2>/dev/null || true
+fi
+ok "Fin binary installed."
 
 # --- choose a bin directory on PATH -----------------------------------------
 pick_bin_dir() {
   if [ -n "${FIN_BIN_DIR:-}" ]; then echo "$FIN_BIN_DIR"; return; fi
   local candidates=("/usr/local/bin" "$HOME/.local/bin" "$HOME/bin" "$HOME/.bin")
-  # Prefer a candidate that is already on PATH and writable.
   for d in "${candidates[@]}"; do
     case ":$PATH:" in
-      *":$d:"*)
-        if [ -d "$d" ] && [ -w "$d" ]; then echo "$d"; return; fi
-        ;;
+      *":$d:"*) if [ -d "$d" ] && [ -w "$d" ]; then echo "$d"; return; fi ;;
     esac
   done
-  # Otherwise, the first writable candidate (creating ~/ ones as needed).
   for d in "${candidates[@]}"; do
     if [ -d "$d" ] && [ -w "$d" ]; then echo "$d"; return; fi
     case "$d" in
       "$HOME"/*) mkdir -p "$d" 2>/dev/null && echo "$d" && return ;;
     esac
   done
-  # Last resort: /usr/local/bin via sudo.
   echo "/usr/local/bin"
 }
 
 BIN_DIR="$(pick_bin_dir)"
 LINK_PATH="$BIN_DIR/fin"
-TARGET="$FIN_HOME_DIR/fin"
+TARGET="$FIN_HOME_DIR/fin/fin"
 
 info "Linking $LINK_PATH -> $TARGET"
 if [ -w "$BIN_DIR" ] || [ ! -e "$BIN_DIR" ]; then
@@ -104,10 +118,27 @@ if [ -w "$BIN_DIR" ] || [ ! -e "$BIN_DIR" ]; then
   ln -sf "$TARGET" "$LINK_PATH"
 else
   warn "$BIN_DIR is not writable; using sudo for the symlink."
-  sudo mkdir -p "$BIN_DIR"
-  sudo ln -sf "$TARGET" "$LINK_PATH"
+  sudo mkdir -p "$BIN_DIR" || die "Could not create $BIN_DIR (sudo required)."
+  sudo ln -sf "$TARGET" "$LINK_PATH" || die "Could not symlink fin into $BIN_DIR (sudo required)."
 fi
 ok "Linked fin into $BIN_DIR"
+
+# --- seed plugs -------------------------------------------------------------
+# Plugs live in ~/.fin/plugs (grouped App/ Asset/ Global/). They are NOT part of
+# the binary; seed them from the plugs repo so `fin up` works out of the box.
+if [ -d "$FIN_DATA_DIR/plugs" ] && [ -n "$(ls -A "$FIN_DATA_DIR/plugs" 2>/dev/null)" ]; then
+  info "Plugs already present at $FIN_DATA_DIR/plugs (leaving as-is)."
+elif command -v git >/dev/null 2>&1; then
+  info "Seeding plugs into $FIN_DATA_DIR/plugs"
+  mkdir -p "$FIN_DATA_DIR"
+  if git clone --quiet "$FIN_PLUGS_REPO" "$FIN_DATA_DIR/plugs"; then
+    ok "Plugs installed."
+  else
+    warn "Could not clone plugs from $FIN_PLUGS_REPO — install them manually into $FIN_DATA_DIR/plugs."
+  fi
+else
+  warn "git not found — install plugs manually into $FIN_DATA_DIR/plugs (App/ Asset/ Global/)."
+fi
 
 # --- PATH hint --------------------------------------------------------------
 case ":$PATH:" in
@@ -118,4 +149,4 @@ esac
 
 echo
 ok  "Fin installed. Run: ${c_cyan}fin --help${c_reset}"
-info "Install plugs into: $HOME/.fin/plugs (grouped App/ Asset/ Global/)"
+info "Requires a running Docker engine. Plugs live in: $FIN_DATA_DIR/plugs"

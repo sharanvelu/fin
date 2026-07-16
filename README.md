@@ -23,6 +23,7 @@ a declarative plugin system, and a single audited path to the Docker daemon.
 - [Environment variables](#environment-variables)
 - [How it works](#how-it-works)
 - [Writing a plug](#writing-a-plug)
+- [Building a release](#building-a-release)
 - [Troubleshooting](#troubleshooting)
 - [Credits](#credits)
 
@@ -41,56 +42,112 @@ a declarative plugin system, and a single audited path to the Docker daemon.
   project, so multiple apps reuse the same database server.
 - **Friendly errors.** No raw tracebacks — Docker problems render as clean Rich
   panels with meaningful exit codes.
-- **No virtualenv.** Fin runs against your system Python 3.11+; the installer
-  uses a `--user` pip install and a `fin` launcher symlinked onto your `PATH`.
+- **No Python on the host.** The published Fin is a **prebuilt, standalone
+  binary** that embeds its own Python interpreter and `fincli` — you just need
+  Docker at runtime. (Developing from source still runs against system Python
+  3.11+ with `--user` packages; see [Install from source](#install-from-source-developers).)
 
 ## Prerequisites
 
 - **Docker** running locally (Docker Desktop, Colima, Rancher Desktop, or Podman
   with a Docker-compatible socket — Fin auto-detects the common socket paths).
-- **Python 3.11+** on your `PATH`.
-- **git** (used by the installer and by `fin plugs install`).
+- **git** — used by the installer to seed the bundled plugs, and by
+  `fin plugs install`. (Optional: if git is missing, install plugs manually.)
+
+> The prebuilt binary needs **no Python, pip, or virtualenv** on the host.
+> Python 3.11+ is only required if you install [from source](#install-from-source-developers).
 
 ## Install
 
-### One-liner
+Fin ships as a prebuilt, standalone binary per OS/arch. A full install is the
+**binary on your `PATH`** plus **plugs seeded into `~/.fin/plugs`** — the
+installer does both.
+
+### One-liner (prebuilt binary)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/<org>/<repo>/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/main/install.sh)"
 ```
 
 The installer:
 
-1. Verifies `git` and a Python 3.11+ interpreter.
-2. Clones the repo into `~/.fin-cli` (override with `FIN_HOME_DIR`).
-3. Installs the Python dependencies for the user, **no virtualenv**:
-   `python3 -m pip install --user typer rich docker`.
-4. Symlinks the `fin` launcher into the first writable directory on your `PATH`
+1. Detects your OS/arch and downloads the matching release tarball
+   `fin-<os>-<arch>.tar.gz` (`os` ∈ `macos`/`linux`, `arch` ∈ `arm64`/`x64`)
+   from the GitHub Releases of `sharanvelu/fin`.
+2. Unpacks it into `~/.fin-cli` (override with `FIN_HOME_DIR`), giving
+   `~/.fin-cli/fin/fin` plus its `_internal/` runtime.
+3. Symlinks the `fin` launcher into the first writable directory on your `PATH`
    (tries `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`; override with
    `FIN_BIN_DIR`).
+4. On macOS, strips the `com.apple.quarantine` attribute so the unsigned binary
+   runs without a Gatekeeper prompt.
+5. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by `git clone`-ing
+   the `sharanvelu/fin-plugs` repo — only if `~/.fin/plugs` is absent and `git`
+   is available.
 
 Installer environment overrides:
 
-| Variable         | Purpose                       | Default                            |
-| ---------------- | ----------------------------- | ---------------------------------- |
-| `FIN_REPO_URL`   | git URL to clone              | the public Fin repo                |
-| `FIN_USE_BRANCH` | branch/tag to check out       | `main`                             |
-| `FIN_HOME_DIR`   | install location              | `$HOME/.fin-cli`                   |
-| `FIN_BIN_DIR`    | where to place the `fin` link | auto-detected writable `PATH` dir  |
+| Variable           | Purpose                                     | Default                            |
+| ------------------ | ------------------------------------------- | ---------------------------------- |
+| `FIN_VERSION`      | release to install (`latest` or e.g. `0.1.0`) | `latest`                         |
+| `FIN_HOME_DIR`     | binary install location                     | `$HOME/.fin-cli`                   |
+| `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
+| `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
+| `FIN_RELEASE_REPO` | GitHub repo hosting the releases            | `sharanvelu/fin`                   |
+| `FIN_PLUGS_REPO`   | git URL for the plugs repo to seed          | `sharanvelu/fin-plugs`             |
 
-### Manual
+### Manual download from Releases
+
+If you'd rather not pipe a script, grab the tarball for your platform from the
+[Releases page](https://github.com/sharanvelu/fin/releases) and place it yourself:
 
 ```bash
-git clone https://github.com/<org>/<repo>.git ~/.fin-cli
-cd ~/.fin-cli
-python3 -m pip install --user typer rich docker
-ln -sf ~/.fin-cli/fin /usr/local/bin/fin   # or any writable dir on your PATH
+# Pick the artifact for your platform, e.g. fin-macos-arm64.tar.gz
+tar -C ~/.fin-cli -xzf fin-macos-arm64.tar.gz     # → ~/.fin-cli/fin/fin + _internal/
+xattr -dr com.apple.quarantine ~/.fin-cli/fin     # macOS only (unsigned binary)
+ln -sf ~/.fin-cli/fin/fin /usr/local/bin/fin      # or any writable dir on your PATH
+
+# Seed the plugs (not bundled in the binary):
+git clone https://github.com/sharanvelu/fin-plugs.git ~/.fin/plugs
+
 fin --help
 ```
 
-The `fin` launcher resolves its own real location (following symlinks), puts the
-Fin package on `PYTHONPATH`, and runs `python3 -m fincli` **from the directory
-you invoked it in** — so the project's `.env` and bind mounts work correctly.
+### Install from source (developers)
+
+Working on Fin itself (or on a plug) uses the Python source path — no prebuilt
+binary. This needs **Python 3.11+** on your `PATH`.
+
+```bash
+git clone https://github.com/sharanvelu/fin.git
+cd fin
+python3 -m pip install --user typer rich docker   # runtime deps, no virtualenv
+
+# Then either run the module directly…
+python3 -m fincli --help
+
+# …or install the `fin` console script (editable), from pyproject's [project.scripts]:
+python3 -m pip install --user -e .
+fin --help
+```
+
+The repo also ships a `fin` bash launcher at its root: it resolves its own real
+location (following symlinks), puts the Fin package on `PYTHONPATH`, and runs
+`python3 -m fincli` **from the directory you invoked it in** — so the project's
+`.env` and bind mounts work correctly. Symlink it onto your `PATH` if you prefer
+it to the console script:
+
+```bash
+ln -sf "$PWD/fin" /usr/local/bin/fin
+```
+
+For development, plugs still load from the fixed `~/.fin/plugs` directory
+(`PLUGS_DIR` is not configurable independently of `FIN_DATA_DIR`). Point it at
+your plugs checkout once:
+
+```bash
+ln -s <fin-plugs repo>/plugs-tree ~/.fin/plugs
+```
 
 ## Quickstart (Laravel)
 
@@ -449,6 +506,39 @@ Key points:
 
 After adding a plug, `fin plugs list` re-scans the directory and refreshes the
 SQLite registry automatically.
+
+## Building a release
+
+Fin is distributed as a standalone binary built with
+[PyInstaller](https://pyinstaller.org/) in **onedir** mode — a directory tree
+(`fin/fin` executable + `_internal/`) that embeds a Python interpreter and the
+`fincli` package. Onedir is used over onefile because it starts fast (no
+per-run extraction to a temp dir). Plugs are **not** bundled: they stay as
+uncompiled `.py` loaded at runtime from `~/.fin/plugs`.
+
+Build a tarball for the current platform:
+
+```bash
+python3 -m pip install --user pyinstaller typer rich docker   # build + runtime deps
+bash packaging/build.sh
+# → dist/fin/                    the onedir tree
+# → dist/fin-<os>-<arch>.tar.gz  the release artifact
+```
+
+`packaging/build.sh` drives PyInstaller against the entry point
+`packaging/fin_entry.py` (which calls `fincli.__main__:main`), collecting the
+`fincli` and `docker` submodules. The runtime deps (`typer`, `rich`, `docker`)
+must be importable so PyInstaller can bundle them.
+
+> **PyInstaller cannot cross-compile** — each `fin-<os>-<arch>.tar.gz` must be
+> built on its own native OS/arch. `.github/workflows/release.yml` does this on a
+> matrix of runners (`macos-14` arm64, `macos-13` x64, `ubuntu-latest` x64,
+> `ubuntu-24.04-arm` arm64), triggered by pushing a `v*` tag, and attaches each
+> tarball to the GitHub Release that `install.sh` downloads from.
+
+> **macOS signing.** The published binary is unsigned, so `install.sh` strips the
+> `com.apple.quarantine` attribute as a stopgap for local installs. The proper
+> fix for a public macOS release is code-signing + notarization.
 
 ## Troubleshooting
 
