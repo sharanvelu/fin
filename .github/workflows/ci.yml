@@ -1,9 +1,9 @@
 name: ci
 
-# Fast checks that gate every change. Runs on every branch push and on PRs into
-# master. Does NOT build the binary — that happens on merge to master (see
-# release.yml). Make the `test` job a required status check on the master branch
-# rule to block merges when tests fail.
+# Fast checks that gate every change. Runs on PRs into master. Does NOT build
+# the binary — that happens on merge to master (see release.yml). Make the
+# `test` job a required status check on the master branch rule to block merges
+# when tests fail.
 
 on:
   pull_request:
