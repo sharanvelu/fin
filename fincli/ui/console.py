@@ -33,6 +33,7 @@ def error(message: str, *, title: str = "Error") -> None:
     """
     body = Text.from_markup(message)
     body.stylize("red")
+    console.print()
     err_console.print(
         Panel(
             body,

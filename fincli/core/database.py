@@ -61,7 +61,7 @@ def _ensure_mysql_database(database: str) -> None:
         return
     sql = (
         f"CREATE DATABASE IF NOT EXISTS `{database}`; "
-        f"GRANT ALL PRIVILEGES ON `{database}`.* "
+        f"GRANT ALL PRIVILEGES ON *.* "
         f"TO '{Config.ASSET_USERNAME}'@'%'; FLUSH PRIVILEGES;"
     )
     # Pass argv directly (no `sh -c`) so backticks in the SQL are NOT treated
