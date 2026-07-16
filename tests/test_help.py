@@ -4,30 +4,59 @@ from __future__ import annotations
 
 import pytest
 
-from pathlib import Path
-
 from fincli import help as help_mod
 from fincli import __main__ as main_mod
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.config import Config
 from fincli.core.env import ProjectEnv
 
-#: The repo's real bundled plugs dir (App/laravel, Asset/...).
-_REAL_PLUGS_DIR = Path(__file__).resolve().parent.parent / "plugs"
+from conftest import write_plug
 
 
 def _empty_env(tmp_path):
     return ProjectEnv(cwd=tmp_path, values={})
 
 
-@pytest.fixture
-def real_plugs(monkeypatch):
-    """Point Config.PLUGS_DIR at the repo's bundled plugs for this test.
+#: Body for a synthetic APP plug that contributes an `artisan` command (alias
+#: `art`) plus a FIN_SITE env var — enough to exercise the plug-command help
+#: renderer without depending on the external plugs repo.
+_SYNTH_PLUG_BODY = '''
+    def env_spec(self):
+        from fincli.core.env import EnvSpec, EnvVar
+        return EnvSpec.of([
+            EnvVar("FIN_SITE", required=True, description="hostname the app is served at"),
+        ])
 
-    Overrides the autouse `isolate_config` fixture (which uses an empty tmp
-    dir) so the laravel plug and its commands are discoverable.
+    def commands(self):
+        def _artisan(ctx, args):
+            return 0
+        return {
+            "artisan": PlugCommand(
+                "artisan", _artisan, "Run an artisan command.", aliases=("art",)
+            ),
+        }
+'''
+
+
+@pytest.fixture
+def synthetic_plug(tmp_path, monkeypatch):
+    """Point Config.PLUGS_DIR at a hermetic synthetic 'laravel' plug.
+
+    The help *renderer* is what's under test; we only need *a* plug that
+    contributes a command (with an alias) and an env spec. Overrides the autouse
+    `isolate_config` empty-dir so the plug and its commands are discoverable.
     """
-    monkeypatch.setattr(Config, "PLUGS_DIR", _REAL_PLUGS_DIR)
+    plugs_dir = tmp_path / "plugs"
+    write_plug(
+        plugs_dir,
+        type_sub="App",
+        name="laravel",
+        class_name="LaravelPlug",
+        plug_type="APP",
+        description="Laravel / PHP application runtime.",
+        body_extra=_SYNTH_PLUG_BODY,
+    )
+    monkeypatch.setattr(Config, "PLUGS_DIR", plugs_dir)
     yield
 
 
@@ -91,8 +120,8 @@ def test_command_help_unknown_returns_false(capsys):
 # --------------------------------------------------------------------------- #
 # print_command_help — plug command
 # --------------------------------------------------------------------------- #
-def test_command_help_plug_command(capsys, tmp_path, real_plugs):
-    # The bundled laravel plug contributes `artisan`.
+def test_command_help_plug_command(capsys, tmp_path, synthetic_plug):
+    # The synthetic laravel plug contributes `artisan`.
     found = help_mod.print_command_help("artisan", env=_empty_env(tmp_path))
     assert found is True
     out = capsys.readouterr().out
@@ -101,7 +130,7 @@ def test_command_help_plug_command(capsys, tmp_path, real_plugs):
     assert "FIN_SITE" in out  # env spec table rendered
 
 
-def test_command_help_plug_alias(capsys, tmp_path, real_plugs):
+def test_command_help_plug_alias(capsys, tmp_path, synthetic_plug):
     # `art` is an alias of artisan.
     found = help_mod.print_command_help("art", env=_empty_env(tmp_path))
     assert found is True

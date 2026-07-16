@@ -13,9 +13,12 @@ containers by hostname.
 ## Project layout
 
 ```
-fin                       bash launcher (symlinked onto PATH; sets PYTHONPATH, execs python -m fincli)
-install.sh                installer (clone → pip --user → symlink)
-pyproject.toml            packaging; deps: typer, rich, docker; dev: pytest, pytest-mock
+fin                       bash launcher (source/dev path; sets PYTHONPATH, execs python -m fincli)
+install.sh                installer for END USERS: downloads a prebuilt binary from Releases, symlinks it, seeds plugs
+packaging/build.sh        builds the standalone binary (PyInstaller onedir) → dist/fin-<os>-<arch>.tar.gz
+packaging/fin_entry.py    PyInstaller entry point (calls fincli.__main__:main)
+.github/workflows/release.yml  CI matrix: build the binary per OS/arch on a v* tag, attach tarballs to the Release
+pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: typer, rich, docker; dev: pytest, pytest-mock
 fincli/
   __main__.py             entrypoint + argv dispatch (main())
   resolver.py             reserved → FIN_APP → FIN_PLUGS → GLOBAL
@@ -38,9 +41,14 @@ fincli/
     registry.py           SQLite cache (~/.fin/registry.db) + `fin plugs` ops
     context.py            PlugContext.exec(...) inside primary container
   commands/               reserved system commands (@reserved decorator)
-plugs/                    bundled plugs (gitignored): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
+plugs/                    plug source (gitignored, separate repo): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
 tests/                    pytest suite + conftest fixtures
 ```
+
+At runtime plugs load from `PLUGS_DIR`, which is fixed at `~/.fin/plugs` (it moves
+with `FIN_DATA_DIR`) — *not* the repo's `plugs/`. For development, symlink the repo
+tree there once: `ln -s "$PWD/plugs" ~/.fin/plugs`. (This keeps the tool binary/
+install immutable while plugs live in the writable user data dir.)
 
 ## Conventions (do not violate)
 
@@ -55,8 +63,10 @@ tests/                    pytest suite + conftest fixtures
 - **Plugs are declarative.** A plug returns `ContainerSpec`/`PlugCommand` and
   asks `PlugContext` to exec. A plug must never import `docker` or call
   `run_container`. Only classes subclassing `FinPlug` are recognised.
-- **No virtualenv.** Fin runs against system Python with user-site packages. Do
-  not add venv-creation steps or assume `.venv` (a stray `.venv/` is gitignored).
+- **No virtualenv.** In development, Fin runs against system Python with
+  user-site packages. Do not add venv-creation steps or assume `.venv` (a stray
+  `.venv/` is gitignored). (End users don't need Python at all — they get a
+  PyInstaller binary that embeds its own interpreter; see `packaging/build.sh`.)
 - **Errors render, never crash.** Raise `FinError` (or `DockerUnavailable`/
   `NotFound`) for expected failures; `@handle_errors` turns them into panels with
   the right exit code. Don't print tracebacks or `sys.exit()` raw integers from

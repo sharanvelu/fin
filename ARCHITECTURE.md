@@ -97,8 +97,10 @@ interactive=True)`, attaching a TTY so `exit` ends them cleanly.
 - **One Docker network (`fin`)** created lazily on first `up`; every container
   carries `FIN_MANAGED=true` plus `FIN_TYPE` / `FIN_SERVICE` / `FIN_SITE` /
   `FIN_PROJECT`, so listing and teardown filter precisely.
-- **No virtualenv.** The `fin` launcher runs system Python 3.11+ via
-  `python3 -m fincli`.
+- **No Python on the host for end users.** Fin ships as a prebuilt PyInstaller
+  binary that embeds its own interpreter; only Docker is needed at runtime. From
+  source (developers), the `fin` launcher runs system Python 3.11+ via
+  `python3 -m fincli` — no virtualenv. See DESIGN.md §10 for packaging.
 - **No raw tracebacks.** Docker/usage errors render as Rich panels; exit codes
   are `0` success, `1` user error, `2` system/Docker error.
 

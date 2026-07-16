@@ -17,7 +17,10 @@ touch Docker themselves — Fin's orchestrator does that on their behalf.
   `PlugContext.exec`). **No `subprocess` calls to the docker CLI.**
 - **Plugs are declarative.** They return `ContainerSpec`/`PlugCommand`; only
   classes subclassing `FinPlug` count. They never import `docker`.
-- **No virtualenv** — Fin runs against system Python with `--user` packages.
+- **No virtualenv** — from source, Fin runs against system Python with `--user`
+  packages. End users instead install a prebuilt PyInstaller binary (embeds its
+  own interpreter; no host Python) — built by `packaging/build.sh`, installed by
+  `install.sh`. Plugs are never bundled: they live as `.py` in `~/.fin/plugs`.
 - **Errors render, never crash.** Raise `FinError`/`DockerUnavailable`/`NotFound`;
   `@handle_errors` renders Rich panels. Exit codes: `0` ok, `1` user error, `2`
   system/Docker error.
@@ -28,9 +31,13 @@ touch Docker themselves — Fin's orchestrator does that on their behalf.
 
 ```bash
 python3 -m pip install --user typer rich docker   # runtime deps (no venv)
+ln -s "$PWD/plugs" ~/.fin/plugs                   # dev: plugs load from ~/.fin/plugs (PLUGS_DIR)
 python3 -m pytest                                 # run the test suite
 python3 -m fincli --help                          # run the CLI from source
 fin up                                            # in a project dir with a FIN_* .env
+
+python3 -m pip install --user pyinstaller         # build tooling
+bash packaging/build.sh                           # build the release binary (per OS/arch)
 ```
 
 ## More detail

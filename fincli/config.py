@@ -5,8 +5,10 @@ credentials, label keys) as opposed to *project* configuration, which is read
 from the project's ``.env`` file (see :mod:`fincli.core.env`).
 
 The values are intentionally centralised so they can be changed in one place.
-In particular ``PLUGS_DIR`` is expected to be re-pointed after development —
-set the ``FIN_PLUGS_DIR`` environment variable, or edit the default below.
+Plugs live under ``DATA_DIR/plugs`` (``~/.fin/plugs``) — a stable, writable,
+per-user location, so a compiled binary can load user-installed plugs from the
+host rather than from inside the bundle. For development, symlink your plugs
+working tree there: ``ln -s <repo>/plugs ~/.fin/plugs``.
 """
 
 from __future__ import annotations
@@ -33,21 +35,16 @@ class Config:
     NETWORK: str = "fin"
 
     # --- Filesystem locations ----------------------------------------------
-    #: Root of the installed Fin source tree (set by the `fin` launcher).
-    ROOT_DIR: Path = _env_path(
-        "FIN_ROOT", Path(__file__).resolve().parent.parent
-    )
-
-    #: Per-user data directory for Fin (config, sqlite registry, certs).
+    #: Per-user data directory for Fin (config, sqlite registry, certs, plugs).
     DATA_DIR: Path = _env_path("FIN_DATA_DIR", Path.home() / ".fin")
 
     #: Directory holding installed plugs, grouped by type:
-    #: ``plugs/App``, ``plugs/Asset``, ``plugs/Global``.
-    #:
-    #: NOTE: This defaults to the bundled ``plugs/`` dir inside the repo for
-    #: development. Re-point it later via the ``FIN_PLUGS_DIR`` env var or by
-    #: editing this default.
-    PLUGS_DIR: Path = _env_path("FIN_PLUGS_DIR", ROOT_DIR / "plugs")
+    #: ``plugs/App``, ``plugs/Asset``, ``plugs/Global``. Fixed under DATA_DIR
+    #: (``~/.fin/plugs``) — a stable host location so a compiled binary loads
+    #: user-installed plugs from disk rather than from inside the bundle. For
+    #: development, symlink your plugs tree here (``ln -s <repo>/plugs
+    #: ~/.fin/plugs``).
+    PLUGS_DIR: Path = DATA_DIR / "plugs"
 
     #: Sub-directories of :attr:`PLUGS_DIR`, one per plug type.
     PLUG_TYPE_DIRS: dict[str, str] = {
