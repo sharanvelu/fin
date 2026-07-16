@@ -29,8 +29,8 @@ class Config:
     """
 
     # --- Identity -----------------------------------------------------------
-    #: The Docker network every Fin-managed container joins.
-    NETWORK: str = os.environ.get("FIN_NETWORK", "fin")
+    #: The Docker network every Fin-managed container joins (fixed).
+    NETWORK: str = "fin"
 
     # --- Filesystem locations ----------------------------------------------
     #: Root of the installed Fin source tree (set by the `fin` launcher).
@@ -57,18 +57,19 @@ class Config:
     }
 
     #: SQLite registry caching installed-plug metadata for fast lookup.
-    REGISTRY_DB: Path = _env_path("FIN_REGISTRY_DB", DATA_DIR / "registry.db")
+    REGISTRY_DB: Path = DATA_DIR / "registry.db"
 
     #: Persisted per-asset enable/disable flags (see `fin config`).
-    CONFIG_FILE: Path = _env_path("FIN_CONFIG_FILE", DATA_DIR / "config.json")
+    CONFIG_FILE: Path = DATA_DIR / "config.json"
 
     # --- Shared asset defaults ---------------------------------------------
     #: Credentials baked into the shared asset containers (DB/redis).
-    ASSET_USERNAME: str = os.environ.get("FIN_ASSET_USERNAME", "fin")
-    ASSET_PASSWORD: str = os.environ.get("FIN_ASSET_PASSWORD", "password")
-    ASSET_DEFAULT_DATABASE: str = os.environ.get(
-        "FIN_ASSET_DEFAULT_DATABASE", "fin"
-    )
+    #: Fixed values (not env-overridable): these throwaway local-dev engines are
+    #: shared across every project on the machine, so a project's .env points its
+    #: DB_USERNAME/DB_PASSWORD at these.
+    ASSET_USERNAME: str = "fin"
+    ASSET_PASSWORD: str = "password"
+    ASSET_DEFAULT_DATABASE: str = "fin"
 
     # --- Label keys ---------------------------------------------------------
     #: Every Fin container carries these labels. Values are documented in
@@ -96,10 +97,10 @@ class Config:
         """Directory of user CA certs Fin installs into opted-in containers.
 
         Reuses the per-user data root (``~/.fin``) that already holds
-        ``config.json`` and ``registry.db``. Resolved lazily (and honouring
-        ``FIN_CERTS_DIR``) so it follows a re-pointed :attr:`DATA_DIR`.
+        ``config.json`` and ``registry.db``. Resolved lazily so it follows a
+        re-pointed :attr:`DATA_DIR`.
         """
-        return _env_path("FIN_CERTS_DIR", cls.DATA_DIR / "certs")
+        return cls.DATA_DIR / "certs"
 
     @classmethod
     def plug_type_dir(cls, plug_type: str) -> Path:
