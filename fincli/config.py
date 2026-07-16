@@ -92,6 +92,16 @@ class Config:
         cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     @classmethod
+    def certs_dir(cls) -> Path:
+        """Directory of user CA certs Fin installs into opted-in containers.
+
+        Reuses the per-user data root (``~/.fin``) that already holds
+        ``config.json`` and ``registry.db``. Resolved lazily (and honouring
+        ``FIN_CERTS_DIR``) so it follows a re-pointed :attr:`DATA_DIR`.
+        """
+        return _env_path("FIN_CERTS_DIR", cls.DATA_DIR / "certs")
+
+    @classmethod
     def plug_type_dir(cls, plug_type: str) -> Path:
         """Return the directory for a given plug type (APP/ASSET/GLOBAL)."""
         sub = cls.PLUG_TYPE_DIRS.get(plug_type.upper(), plug_type)

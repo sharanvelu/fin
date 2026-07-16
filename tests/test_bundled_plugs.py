@@ -55,6 +55,10 @@ def test_laravel_primary_spec(bundled_plugs, tmp_path):
     assert spec.web_exposed is True
     assert spec.web_port == 80
     assert spec.workdir_mount == "/var/www/html"
+    # Laravel opts into installing ~/.fin/certs (Debian image → spec defaults).
+    assert spec.install_certs is True
+    assert spec.cert_dir == "/usr/local/share/ca-certificates"
+    assert spec.cert_update_cmd == ["update-ca-certificates"]
 
 
 def test_laravel_primary_spec_custom_image(bundled_plugs, tmp_path):

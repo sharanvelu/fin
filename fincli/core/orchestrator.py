@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fincli.config import Config
+from fincli.core.certs import install_certs
 from fincli.core.containers import (
     base_labels,
     ensure_network,
@@ -79,6 +80,10 @@ def start_primary(spec: ContainerSpec, env: ProjectEnv) -> Any:
         )
     verb = "Started" if result.created else "Already running:"
     success(f"{verb} [bold]{name}[/bold] [dim]({spec.image})[/dim]")
+    # Install the user's CA certs if this plug opted in (runs every `up`;
+    # idempotent, so certs added later are picked up without a recreate).
+    if spec.install_certs:
+        install_certs(result.container, spec)
     return result.container
 
 
@@ -156,4 +161,6 @@ def start_asset(spec: ContainerSpec, fin_type: str = "asset") -> Any:
         )
     verb = "Started" if result.created else "Already running:"
     success(f"{verb} [bold]{name}[/bold] [dim]({spec.image})[/dim]")
+    if spec.install_certs:
+        install_certs(result.container, spec)
     return result.container

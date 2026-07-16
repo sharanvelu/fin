@@ -90,6 +90,17 @@ class ContainerSpec:
     workdir_mount: str | None = None
     #: Extra kwargs forwarded to ``containers.run``.
     extra: dict[str, Any] = field(default_factory=dict)
+    #: Opt in to installing the user's CA certs (``~/.fin/certs``) into this
+    #: container on every ``fin up``. Off by default — a plug must ask for it.
+    install_certs: bool = False
+    #: Container path of the CA trust dir. Default targets Debian/Ubuntu/Alpine;
+    #: override for other families (RHEL: ``/etc/pki/ca-trust/source/anchors``).
+    cert_dir: str = "/usr/local/share/ca-certificates"
+    #: Command run (as root) to refresh the trust store after certs are copied.
+    #: Override for RHEL-family images (``["update-ca-trust", "extract"]``).
+    cert_update_cmd: list[str] = field(
+        default_factory=lambda: ["update-ca-certificates"]
+    )
 
 
 @dataclass

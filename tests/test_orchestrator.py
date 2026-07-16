@@ -69,6 +69,55 @@ def test_start_primary_no_traefik_without_site(monkeypatch, patch_docker, tmp_pa
     assert "traefik.enable" not in captured["labels"]
 
 
+def test_start_primary_installs_certs_when_opted_in(monkeypatch, patch_docker, tmp_path):
+    calls = []
+    container = make_fake_container()
+
+    def fake_run(**kwargs):
+        from fincli.core.containers import RunResult
+        return RunResult(container=container, created=True)
+
+    monkeypatch.setattr(orch, "run_container", fake_run)
+    monkeypatch.setattr(orch, "ensure_network", lambda: None)
+    monkeypatch.setattr(orch, "install_certs", lambda c, s: calls.append((c, s)))
+
+    spec = ContainerSpec(service="web", image="demo", install_certs=True)
+    orch.start_primary(spec, _env(tmp_path))
+    assert calls == [(container, spec)]
+
+
+def test_start_primary_skips_certs_by_default(monkeypatch, patch_docker, tmp_path):
+    calls = []
+
+    def fake_run(**kwargs):
+        from fincli.core.containers import RunResult
+        return RunResult(container=make_fake_container(), created=True)
+
+    monkeypatch.setattr(orch, "run_container", fake_run)
+    monkeypatch.setattr(orch, "ensure_network", lambda: None)
+    monkeypatch.setattr(orch, "install_certs", lambda c, s: calls.append(s))
+
+    orch.start_primary(ContainerSpec(service="web", image="demo"), _env(tmp_path))
+    assert calls == []  # install_certs defaults to False
+
+
+def test_start_asset_installs_certs_when_opted_in(monkeypatch, patch_docker, tmp_path):
+    calls = []
+
+    def fake_run(**kwargs):
+        from fincli.core.containers import RunResult
+        return RunResult(container=make_fake_container(), created=True)
+
+    monkeypatch.setattr(orch, "run_container", fake_run)
+    monkeypatch.setattr(orch, "ensure_network", lambda: None)
+    monkeypatch.setattr(orch, "install_certs", lambda c, s: calls.append(s))
+
+    spec = ContainerSpec(service="mysql", image="mysql:8.0",
+                         container_name="fin_mysql", install_certs=True)
+    orch.start_asset(spec)
+    assert calls == [spec]
+
+
 def test_start_asset_fixed_name(monkeypatch, patch_docker, tmp_path):
     captured = {}
 
