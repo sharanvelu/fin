@@ -269,10 +269,19 @@ picks them up; re-run after changing `FIN_APP`/`FIN_PLUGS` or upgrading plugs.
 | Command | Description |
 | ------- | ----------- |
 | `fin agents list` (alias `ls`) | List supported agents, the file each one writes, and whether it's present. |
-| `fin agents install [agent ...\|all]` | Generate instruction files into the current project. Default set: `claude` (`.claude/skills/fin-commands/SKILL.md`), `cursor` (`.cursor/rules/fin-commands.mdc`), `codex` (`AGENTS.md`). `copilot` (`.github/copilot-instructions.md`) via `all` or by name. |
+| `fin agents install [agent ...\|all]` | Generate instruction files into the current project. Default set: `claude` (`.claude/skills/fin-commands/SKILL.md`), `cursor` (`.cursor/rules/fin-commands.mdc`), `codex` (`AGENTS.md`). More via `all` or by name — see below. |
 
-Fin-owned files (the Claude skill, the Cursor rule) are rewritten whole.
-Shared files (`AGENTS.md`, Copilot instructions) are only touched inside a
+Supported targets: `claude`, `cursor`, `codex`, `opencode`, `kilocode`,
+`kimi`, `antigravity`, `copilot-cli` (these six all read the cross-agent
+`AGENTS.md` natively, so they share one file), `copilot` (VS Code Copilot
+Chat & coding agent — `.github/copilot-instructions.md`), `gemini`
+(`GEMINI.md`), `codebuddy` (`.codebuddy/rules/fin-commands.md`), and `aider`
+(`CONVENTIONS.md` plus a `.aider.conf.yml` with `read: CONVENTIONS.md`,
+created only if the conf doesn't already exist).
+
+Fin-owned files (the Claude skill, the Cursor and CodeBuddy rules) are
+rewritten whole. Shared files (`AGENTS.md`, `GEMINI.md`, Copilot
+instructions, `CONVENTIONS.md`) are only touched inside a
 `<!-- fin:agents:begin/end -->` marker block — hand-written content around the
 block survives every re-run.
 

@@ -96,11 +96,22 @@ def _install(args: list[str]) -> int:
             "generating generic instructions with core commands only."
         )
 
-    files = [TARGETS[n].render(content) for n in names]
+    # Many targets share AGENTS.md — write each distinct file once.
+    files: list = []
+    seen_paths: set[str] = set()
+    for n in names:
+        for gf in TARGETS[n].render(content):
+            if gf.path not in seen_paths:
+                seen_paths.add(gf.path)
+                files.append(gf)
+
     for gf, action in install_files(env.cwd, files):
         merged = " [dim](merged into fin block)[/dim]" if gf.managed_block else ""
         if action == "unchanged":
             info(f"{gf.path} already up to date")
+        elif action == "skipped":
+            note = f" — {gf.skip_hint}" if gf.skip_hint else ""
+            info(f"{gf.path} exists, left untouched{note}")
         else:
             success(f"{action} [bold]{gf.path}[/bold]{merged}")
     hint("Commit these files so every teammate's agent picks them up.")

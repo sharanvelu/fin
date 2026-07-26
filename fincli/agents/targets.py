@@ -1,10 +1,15 @@
 """Per-agent renderers — one canonical body, many file formats.
 
 Each :class:`AgentTarget` turns an :class:`~fincli.agents.content.AgentContent`
-into a :class:`GeneratedFile`. Files fully owned by Fin (the Claude skill, the
-Cursor rule) are written whole; files a project may already maintain by hand
-(``AGENTS.md``, Copilot instructions) are marked ``managed_block`` so the
-installer merges them inside fin-owned markers instead of overwriting.
+into one or more :class:`GeneratedFile`\\ s. Files fully owned by Fin (the
+Claude skill, the Cursor rule, the CodeBuddy rule) are written whole; files a
+project may already maintain by hand (``AGENTS.md``, ``GEMINI.md``, Copilot
+instructions, ``CONVENTIONS.md``) are marked ``managed_block`` so the installer
+merges them inside fin-owned markers instead of overwriting.
+
+Many tools read the cross-agent ``AGENTS.md`` standard natively (Codex,
+OpenCode, Kilo Code, Kimi Code, Google Antigravity, GitHub Copilot CLI), so
+those targets all render the same file — the installer dedupes by path.
 """
 
 from __future__ import annotations
@@ -29,19 +34,26 @@ class GeneratedFile:
     #: When True, *content* is merged into any existing file inside fin-owned
     #: marker comments instead of replacing the whole file.
     managed_block: bool = False
+    #: When True, the file is only written if it does not exist yet — an
+    #: existing file is never touched (used for tool config like
+    #: ``.aider.conf.yml`` that users own).
+    create_only: bool = False
+    #: Shown when a ``create_only`` file already exists and is skipped.
+    skip_hint: str = ""
 
 
 @dataclass(frozen=True)
 class AgentTarget:
-    """One supported AI agent and how to render its instruction file."""
+    """One supported AI agent and how to render its instruction file(s)."""
 
     name: str
     label: str
+    #: Primary file, for display in ``fin agents list``.
     path: str
-    render: Callable[[AgentContent], GeneratedFile]
+    render: Callable[[AgentContent], list[GeneratedFile]]
 
 
-def _render_claude(content: AgentContent) -> GeneratedFile:
+def _render_claude(content: AgentContent) -> list[GeneratedFile]:
     text = (
         "---\n"
         "name: fin-commands\n"
@@ -56,10 +68,10 @@ def _render_claude(content: AgentContent) -> GeneratedFile:
         "\n"
         f"{content.body}"
     )
-    return GeneratedFile(path=".claude/skills/fin-commands/SKILL.md", content=text)
+    return [GeneratedFile(path=".claude/skills/fin-commands/SKILL.md", content=text)]
 
 
-def _render_cursor(content: AgentContent) -> GeneratedFile:
+def _render_cursor(content: AgentContent) -> list[GeneratedFile]:
     text = (
         "---\n"
         f'description: "{content.description}"\n'
@@ -70,22 +82,67 @@ def _render_cursor(content: AgentContent) -> GeneratedFile:
         "\n"
         f"{content.body}"
     )
-    return GeneratedFile(path=".cursor/rules/fin-commands.mdc", content=text)
+    return [GeneratedFile(path=".cursor/rules/fin-commands.mdc", content=text)]
 
 
-def _render_agents_md(content: AgentContent) -> GeneratedFile:
-    return GeneratedFile(path="AGENTS.md", content=content.body, managed_block=True)
+def _render_agents_md(content: AgentContent) -> list[GeneratedFile]:
+    return [GeneratedFile(path="AGENTS.md", content=content.body, managed_block=True)]
 
 
-def _render_copilot(content: AgentContent) -> GeneratedFile:
-    return GeneratedFile(
-        path=".github/copilot-instructions.md",
-        content=content.body,
-        managed_block=True,
+def _render_copilot(content: AgentContent) -> list[GeneratedFile]:
+    return [
+        GeneratedFile(
+            path=".github/copilot-instructions.md",
+            content=content.body,
+            managed_block=True,
+        )
+    ]
+
+
+def _render_gemini(content: AgentContent) -> list[GeneratedFile]:
+    return [GeneratedFile(path="GEMINI.md", content=content.body, managed_block=True)]
+
+
+def _render_codebuddy(content: AgentContent) -> list[GeneratedFile]:
+    # A rule file is additive: unlike creating CODEBUDDY.md, it doesn't stop
+    # CodeBuddy from falling back to AGENTS.md for the rest of the project.
+    text = (
+        "---\n"
+        "enabled: true\n"
+        "alwaysApply: true\n"
+        "---\n"
+        "\n"
+        f"<!-- {GENERATED_NOTE} -->\n"
+        "\n"
+        f"{content.body}"
     )
+    return [GeneratedFile(path=".codebuddy/rules/fin-commands.md", content=text)]
+
+
+_AIDER_CONF = (
+    "# Created by `fin agents install` so aider auto-loads the Fin conventions\n"
+    "# (equivalent to `aider --read CONVENTIONS.md`).\n"
+    "read: CONVENTIONS.md\n"
+)
+
+
+def _render_aider(content: AgentContent) -> list[GeneratedFile]:
+    # Aider auto-reads no instruction file; the canonical setup is a
+    # conventions file wired in via `read:` in .aider.conf.yml.
+    return [
+        GeneratedFile(path="CONVENTIONS.md", content=content.body, managed_block=True),
+        GeneratedFile(
+            path=".aider.conf.yml",
+            content=_AIDER_CONF,
+            create_only=True,
+            skip_hint="make sure it contains: read: CONVENTIONS.md",
+        ),
+    ]
 
 
 #: All supported agents, keyed by CLI name (dict order = display order).
+#: Several tools natively read the shared AGENTS.md; the installer writes it
+#: once no matter how many of those targets are selected.
 TARGETS: dict[str, AgentTarget] = {
     "claude": AgentTarget(
         name="claude",
@@ -101,18 +158,66 @@ TARGETS: dict[str, AgentTarget] = {
     ),
     "codex": AgentTarget(
         name="codex",
-        label="Codex & any AGENTS.md-aware agent",
+        label="Codex (native AGENTS.md)",
+        path="AGENTS.md",
+        render=_render_agents_md,
+    ),
+    "opencode": AgentTarget(
+        name="opencode",
+        label="OpenCode (native AGENTS.md)",
+        path="AGENTS.md",
+        render=_render_agents_md,
+    ),
+    "kilocode": AgentTarget(
+        name="kilocode",
+        label="Kilo Code (native AGENTS.md)",
+        path="AGENTS.md",
+        render=_render_agents_md,
+    ),
+    "kimi": AgentTarget(
+        name="kimi",
+        label="Kimi Code CLI (native AGENTS.md)",
+        path="AGENTS.md",
+        render=_render_agents_md,
+    ),
+    "antigravity": AgentTarget(
+        name="antigravity",
+        label="Google Antigravity (native AGENTS.md)",
+        path="AGENTS.md",
+        render=_render_agents_md,
+    ),
+    "copilot-cli": AgentTarget(
+        name="copilot-cli",
+        label="GitHub Copilot CLI (native AGENTS.md)",
         path="AGENTS.md",
         render=_render_agents_md,
     ),
     "copilot": AgentTarget(
         name="copilot",
-        label="GitHub Copilot",
+        label="GitHub Copilot — VS Code Chat & coding agent",
         path=".github/copilot-instructions.md",
         render=_render_copilot,
+    ),
+    "gemini": AgentTarget(
+        name="gemini",
+        label="Gemini CLI",
+        path="GEMINI.md",
+        render=_render_gemini,
+    ),
+    "codebuddy": AgentTarget(
+        name="codebuddy",
+        label="CodeBuddy Code (rule file)",
+        path=".codebuddy/rules/fin-commands.md",
+        render=_render_codebuddy,
+    ),
+    "aider": AgentTarget(
+        name="aider",
+        label="Aider (CONVENTIONS.md + .aider.conf.yml)",
+        path="CONVENTIONS.md",
+        render=_render_aider,
     ),
 }
 
 #: Installed when ``fin agents install`` is run with no explicit agents.
-#: AGENTS.md already covers most AGENTS.md-aware tools; Copilot is opt-in.
+#: AGENTS.md already covers every AGENTS.md-native tool; the rest are opt-in.
 DEFAULT_TARGETS: tuple[str, ...] = ("claude", "cursor", "codex")

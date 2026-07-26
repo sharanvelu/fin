@@ -95,7 +95,7 @@ def test_build_content_without_app_plug(project):
 # --------------------------------------------------------------------------- #
 def test_claude_skill_render(project):
     content = build_content(ProjectEnv.load(cwd=project))
-    gf = TARGETS["claude"].render(content)
+    [gf] = TARGETS["claude"].render(content)
     assert gf.path == ".claude/skills/fin-commands/SKILL.md"
     assert not gf.managed_block
     assert gf.content.startswith("---\nname: fin-commands\n")
@@ -105,15 +105,42 @@ def test_claude_skill_render(project):
 
 def test_cursor_rule_render(project):
     content = build_content(ProjectEnv.load(cwd=project))
-    gf = TARGETS["cursor"].render(content)
+    [gf] = TARGETS["cursor"].render(content)
     assert gf.path == ".cursor/rules/fin-commands.mdc"
     assert "alwaysApply: true" in gf.content
 
 
 def test_shared_files_are_managed_blocks(project):
     content = build_content(ProjectEnv.load(cwd=project))
-    assert TARGETS["codex"].render(content).managed_block
-    assert TARGETS["copilot"].render(content).managed_block
+    for name in ("codex", "copilot", "gemini"):
+        [gf] = TARGETS[name].render(content)
+        assert gf.managed_block, name
+
+
+def test_agents_md_native_tools_share_one_file(project):
+    content = build_content(ProjectEnv.load(cwd=project))
+    for name in ("codex", "opencode", "kilocode", "kimi", "antigravity", "copilot-cli"):
+        [gf] = TARGETS[name].render(content)
+        assert gf.path == "AGENTS.md", name
+        assert gf.managed_block, name
+
+
+def test_codebuddy_rule_render(project):
+    content = build_content(ProjectEnv.load(cwd=project))
+    [gf] = TARGETS["codebuddy"].render(content)
+    assert gf.path == ".codebuddy/rules/fin-commands.md"
+    assert not gf.managed_block
+    assert gf.content.startswith("---\nenabled: true\nalwaysApply: true\n---\n")
+
+
+def test_aider_renders_conventions_and_conf(project):
+    content = build_content(ProjectEnv.load(cwd=project))
+    conventions, conf = TARGETS["aider"].render(content)
+    assert conventions.path == "CONVENTIONS.md"
+    assert conventions.managed_block
+    assert conf.path == ".aider.conf.yml"
+    assert conf.create_only
+    assert "read: CONVENTIONS.md" in conf.content
 
 
 # --------------------------------------------------------------------------- #
@@ -121,7 +148,7 @@ def test_shared_files_are_managed_blocks(project):
 # --------------------------------------------------------------------------- #
 def test_install_creates_files_then_reports_unchanged(project):
     content = build_content(ProjectEnv.load(cwd=project))
-    files = [TARGETS[n].render(content) for n in DEFAULT_TARGETS]
+    files = [gf for n in DEFAULT_TARGETS for gf in TARGETS[n].render(content)]
 
     first = install_files(project, files)
     assert [action for _, action in first] == ["created"] * len(files)
@@ -137,7 +164,7 @@ def test_install_creates_files_then_reports_unchanged(project):
 def test_agents_md_merge_preserves_hand_written_content(project):
     (project / "AGENTS.md").write_text("# My notes\n\nKeep me.\n")
     content = build_content(ProjectEnv.load(cwd=project))
-    install_files(project, [TARGETS["codex"].render(content)])
+    install_files(project, TARGETS["codex"].render(content))
 
     text = (project / "AGENTS.md").read_text()
     assert text.startswith("# My notes")
@@ -172,6 +199,25 @@ def test_agents_install_all_includes_copilot(project, monkeypatch):
     monkeypatch.chdir(project)
     assert agents(["install", "all"]) == EXIT_OK
     assert (project / ".github/copilot-instructions.md").exists()
+    assert (project / "GEMINI.md").exists()
+    assert (project / ".codebuddy/rules/fin-commands.md").exists()
+    assert (project / "CONVENTIONS.md").exists()
+    assert (project / ".aider.conf.yml").exists()
+
+
+def test_agents_install_dedupes_shared_agents_md(project, monkeypatch):
+    monkeypatch.chdir(project)
+    assert agents(["install", "codex", "opencode", "kimi", "antigravity"]) == EXIT_OK
+    text = (project / "AGENTS.md").read_text()
+    assert text.count(BEGIN_MARK) == 1 and text.count(END_MARK) == 1
+
+
+def test_agents_install_aider_never_touches_existing_conf(project, monkeypatch):
+    monkeypatch.chdir(project)
+    (project / ".aider.conf.yml").write_text("model: gpt-5\n")
+    assert agents(["install", "aider"]) == EXIT_OK
+    assert (project / "CONVENTIONS.md").exists()
+    assert (project / ".aider.conf.yml").read_text() == "model: gpt-5\n"
 
 
 def test_agents_install_rejects_unknown_agent(project, monkeypatch):

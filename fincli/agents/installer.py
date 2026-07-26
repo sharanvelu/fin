@@ -53,7 +53,8 @@ def install_files(
     """Write *files* under *root*; return (file, action) pairs.
 
     Actions: ``created`` (file did not exist), ``updated`` (content changed),
-    ``unchanged`` (already up to date — nothing written).
+    ``unchanged`` (already up to date — nothing written), ``skipped``
+    (``create_only`` file already exists — left untouched).
     """
     results: list[tuple[GeneratedFile, str]] = []
     for gf in files:
@@ -63,6 +64,9 @@ def install_files(
             if target.exists()
             else None
         )
+        if gf.create_only and existing is not None:
+            results.append((gf, "skipped"))
+            continue
         new = merge_managed(existing, gf.content) if gf.managed_block else gf.content
         if existing == new:
             results.append((gf, "unchanged"))
