@@ -257,6 +257,25 @@ delegated to a plug.
 | `fin plugs install <name\|git-url>` | Install a plug from a git URL (catalog install pending). |
 | `fin plugs uninstall <name>` | Remove an installed plug from disk. |
 
+### AI agents
+
+Fin can generate instruction files that teach AI coding agents (Claude Code,
+Cursor, Codex, GitHub Copilot, …) to run project commands through `fin`
+(`fin composer install`, never bare `composer install`). The content is
+tailored to the project: command tables are built from the installed plugs'
+`commands()` metadata. Commit the generated files so every teammate's agent
+picks them up; re-run after changing `FIN_APP`/`FIN_PLUGS` or upgrading plugs.
+
+| Command | Description |
+| ------- | ----------- |
+| `fin agents list` (alias `ls`) | List supported agents, the file each one writes, and whether it's present. |
+| `fin agents install [agent ...\|all]` | Generate instruction files into the current project. Default set: `claude` (`.claude/skills/fin-commands/SKILL.md`), `cursor` (`.cursor/rules/fin-commands.mdc`), `codex` (`AGENTS.md`). `copilot` (`.github/copilot-instructions.md`) via `all` or by name. |
+
+Fin-owned files (the Claude skill, the Cursor rule) are rewritten whole.
+Shared files (`AGENTS.md`, Copilot instructions) are only touched inside a
+`<!-- fin:agents:begin/end -->` marker block — hand-written content around the
+block survives every re-run.
+
 ### Laravel plug
 
 Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):

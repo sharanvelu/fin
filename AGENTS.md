@@ -35,6 +35,7 @@ fincli/
     store.py              ~/.fin/config.json asset enable flags
     errors.py             FinError + @handle_errors decorator
   ui/                     console, tables, spinners — the ONLY place that prints
+  agents/                 `fin agents` content: per-agent instruction-file renderers + installer
   plugs/
     base.py               FinPlug, ContainerSpec, PlugCommand, PlugType
     loader.py             importlib discovery over App/Asset/Global dirs
