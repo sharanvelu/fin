@@ -13,7 +13,7 @@ from fincli.commands.agents_cmd import agents
 from fincli.config import Config
 from fincli.core.env import ProjectEnv
 
-COMMANDS_BODY = '''
+COMMANDS_BODY = """
     def commands(self):
         def _run(ctx, args):
             return 0
@@ -28,7 +28,7 @@ COMMANDS_BODY = '''
                 help="Run php artisan inside the app container.",
             ),
         }
-'''
+"""
 
 
 @pytest.fixture

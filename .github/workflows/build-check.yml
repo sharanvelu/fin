@@ -1,0 +1,116 @@
+# Prove the artifacts still build — WITHOUT publishing anything.
+# Publishing happens post-merge in build.yml (rolling `latest`) / tag.yml (v*).
+#
+# Required status check: "Build Check Gate" (only the gate — both work jobs
+# are path-filtered and may legitimately be skipped).
+#
+#   package  sdist + wheel via `python -m build`, metadata sanity via twine
+#   binary   the PyInstaller onedir build (packaging/build.sh) on one platform
+#            only — it is the slowest job, so it runs only when the packaging
+#            definition itself changes; the release matrix covers the rest
+
+name: build check
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: build-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python || 'true' }}
+      packaging: ${{ steps.filter.outputs.packaging || 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            python:
+              - 'fincli/**'
+              - 'pyproject.toml'
+              - '.github/workflows/build-check.yml'
+              - '.github/actions/setup/**'
+            packaging:
+              - 'packaging/**'
+              - 'pyproject.toml'
+              - '.github/workflows/build-check.yml'
+              - '.github/actions/setup/**'
+
+  package:
+    name: sdist + wheel
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          install-project: "false"
+          extra-packages: build twine
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Check package metadata
+        run: python -m twine check dist/*
+
+  binary:
+    name: PyInstaller binary (linux-x64)
+    needs: changes
+    if: needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          extra-packages: pyinstaller
+
+      - name: Build the onedir binary
+        run: bash packaging/build.sh
+
+      - name: Smoke-test the binary
+        run: dist/fin/fin --help
+
+  gate:
+    name: Build Check Gate
+    needs: [changes, package, binary]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All jobs succeeded or were skipped as not relevant."

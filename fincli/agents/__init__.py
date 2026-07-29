@@ -14,7 +14,12 @@ layouts. Plugs stay declarative and contribute nothing agent-specific.
 
 from __future__ import annotations
 
-from fincli.agents.content import AgentContent, CommandDoc, build_content, project_commands
+from fincli.agents.content import (
+    AgentContent,
+    CommandDoc,
+    build_content,
+    project_commands,
+)
 from fincli.agents.installer import install_files, merge_managed
 from fincli.agents.targets import DEFAULT_TARGETS, TARGETS, AgentTarget, GeneratedFile
 

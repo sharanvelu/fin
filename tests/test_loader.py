@@ -44,16 +44,28 @@ def test_load_all_finds_dummy_app_plug(plugs_dir, plug_factory):
 
 
 def test_load_all_explicit_dir_argument(plugs_dir, plug_factory):
-    plug_factory(plugs_dir, type_sub="Asset", name="cache", class_name="CachePlug", plug_type="ASSET")
+    plug_factory(
+        plugs_dir,
+        type_sub="Asset",
+        name="cache",
+        class_name="CachePlug",
+        plug_type="ASSET",
+    )
     loaded = load_all(plugs_dir)
     assert [lp.name for lp in loaded] == ["cache"]
     assert loaded[0].plug_type is PlugType.ASSET
 
 
 def test_load_all_multiple_types(plugs_dir, plug_factory):
-    plug_factory(plugs_dir, type_sub="App", name="webapp", class_name="WebApp", plug_type="APP")
-    plug_factory(plugs_dir, type_sub="Asset", name="db", class_name="Db", plug_type="ASSET")
-    plug_factory(plugs_dir, type_sub="Global", name="tool", class_name="Tool", plug_type="GLOBAL")
+    plug_factory(
+        plugs_dir, type_sub="App", name="webapp", class_name="WebApp", plug_type="APP"
+    )
+    plug_factory(
+        plugs_dir, type_sub="Asset", name="db", class_name="Db", plug_type="ASSET"
+    )
+    plug_factory(
+        plugs_dir, type_sub="Global", name="tool", class_name="Tool", plug_type="GLOBAL"
+    )
     loaded = load_all()
     names = {lp.name: lp.plug_type for lp in loaded}
     assert names == {
@@ -64,7 +76,9 @@ def test_load_all_multiple_types(plugs_dir, plug_factory):
 
 
 def test_load_all_skips_underscore_and_dot_dirs(plugs_dir, plug_factory):
-    plug_factory(plugs_dir, type_sub="App", name="real", class_name="Real", plug_type="APP")
+    plug_factory(
+        plugs_dir, type_sub="App", name="real", class_name="Real", plug_type="APP"
+    )
     (plugs_dir / "App" / "_hidden").mkdir()
     (plugs_dir / "App" / ".dotdir").mkdir()
     loaded = load_all()
@@ -100,7 +114,9 @@ def test_load_plug_dir_setup_failure_returns_none(plugs_dir):
 
 
 def test_load_by_name_directory_match(plugs_dir, plug_factory):
-    plug_factory(plugs_dir, type_sub="App", name="laravel", class_name="Laravel", plug_type="APP")
+    plug_factory(
+        plugs_dir, type_sub="App", name="laravel", class_name="Laravel", plug_type="APP"
+    )
     lp = load_by_name("laravel")
     assert lp is not None
     assert lp.name == "laravel"
@@ -112,15 +128,25 @@ def test_load_by_name_unknown_returns_none(plugs_dir):
 
 def test_load_by_name_app_before_asset_order(plugs_dir, plug_factory):
     # Same dir name in two types — App should be searched first.
-    plug_factory(plugs_dir, type_sub="App", name="dup", class_name="DupApp", plug_type="APP")
-    plug_factory(plugs_dir, type_sub="Asset", name="dup", class_name="DupAsset", plug_type="ASSET")
+    plug_factory(
+        plugs_dir, type_sub="App", name="dup", class_name="DupApp", plug_type="APP"
+    )
+    plug_factory(
+        plugs_dir,
+        type_sub="Asset",
+        name="dup",
+        class_name="DupAsset",
+        plug_type="ASSET",
+    )
     lp = load_by_name("dup")
     assert lp.plug_type is PlugType.APP
 
 
 def test_load_by_name_fallback_to_declared_name(plugs_dir, plug_factory):
     # Directory name differs from declared plug name.
-    plug_factory(plugs_dir, type_sub="App", name="dirname", class_name="P", plug_type="APP")
+    plug_factory(
+        plugs_dir, type_sub="App", name="dirname", class_name="P", plug_type="APP"
+    )
     # overwrite declared name to something else
     (plugs_dir / "App" / "dirname" / "__init__.py").write_text(
         "from fincli.plugs.base import FinPlug, PlugType\n"
@@ -138,7 +164,6 @@ def test_load_all_only_counts_class_defined_in_module(plugs_dir):
     pkg = plugs_dir / "App" / "importer"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text(
-        "from fincli.plugs.base import FinPlug  # imported, not subclassed\n"
-        "VALUE = 1\n"
+        "from fincli.plugs.base import FinPlug  # imported, not subclassed\nVALUE = 1\n"
     )
     assert load_all() == []

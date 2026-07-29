@@ -9,8 +9,8 @@ import pytest
 
 from fincli.config import Config
 from fincli.core.env import ProjectEnv
-from fincli.resolver import Resolution, resolve
-from fincli.commands import RESERVED_COMMANDS, load_reserved
+from fincli.resolver import resolve
+from fincli.commands import load_reserved
 
 
 @pytest.fixture
@@ -40,13 +40,17 @@ def test_resolve_unknown_returns_none(plugs_dir, tmp_path):
 
 
 def test_resolve_plug_command(plugs_dir, plug_factory, tmp_path):
-    body = '''
+    body = """
     def commands(self):
         return {"hello": PlugCommand("hello", lambda ctx, args: 42)}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="App", name="myapp", class_name="MyApp",
-        plug_type="APP", body_extra=body,
+        plugs_dir,
+        type_sub="App",
+        name="myapp",
+        class_name="MyApp",
+        plug_type="APP",
+        body_extra=body,
     )
     env = _make_env(tmp_path, FIN_APP="myapp")
     res = resolve("hello", [], env)
@@ -58,13 +62,17 @@ def test_resolve_plug_command(plugs_dir, plug_factory, tmp_path):
 
 def test_reserved_beats_plug_of_same_name(plugs_dir, plug_factory, tmp_path):
     # Plug also defines an "up" command, but reserved must win.
-    body = '''
+    body = """
     def commands(self):
         return {"up": PlugCommand("up", lambda ctx, args: 999)}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="App", name="myapp", class_name="MyApp",
-        plug_type="APP", body_extra=body,
+        plugs_dir,
+        type_sub="App",
+        name="myapp",
+        class_name="MyApp",
+        plug_type="APP",
+        body_extra=body,
     )
     env = _make_env(tmp_path, FIN_APP="myapp")
     res = resolve("up", [], env)
@@ -73,13 +81,17 @@ def test_reserved_beats_plug_of_same_name(plugs_dir, plug_factory, tmp_path):
 
 
 def test_resolve_plug_alias(plugs_dir, plug_factory, tmp_path):
-    body = '''
+    body = """
     def commands(self):
         return {"hello": PlugCommand("hello", lambda ctx, args: 7, aliases=("hi",))}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="App", name="myapp", class_name="MyApp",
-        plug_type="APP", body_extra=body,
+        plugs_dir,
+        type_sub="App",
+        name="myapp",
+        class_name="MyApp",
+        plug_type="APP",
+        body_extra=body,
     )
     env = _make_env(tmp_path, FIN_APP="myapp")
     res = resolve("hi", [], env)
@@ -88,13 +100,17 @@ def test_resolve_plug_alias(plugs_dir, plug_factory, tmp_path):
 
 
 def test_resolve_global_plug(plugs_dir, plug_factory, tmp_path):
-    body = '''
+    body = """
     def commands(self):
         return {"gcmd": PlugCommand("gcmd", lambda ctx, args: 5)}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="Global", name="gtool", class_name="GTool",
-        plug_type="GLOBAL", body_extra=body,
+        plugs_dir,
+        type_sub="Global",
+        name="gtool",
+        class_name="GTool",
+        plug_type="GLOBAL",
+        body_extra=body,
     )
     env = _make_env(tmp_path)  # no FIN_APP
     res = resolve("gcmd", [], env)
@@ -104,13 +120,17 @@ def test_resolve_global_plug(plugs_dir, plug_factory, tmp_path):
 
 
 def test_resolve_passes_args_to_handler(plugs_dir, plug_factory, tmp_path):
-    body = '''
+    body = """
     def commands(self):
         return {"echo": PlugCommand("echo", lambda ctx, args: len(args))}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="App", name="myapp", class_name="MyApp",
-        plug_type="APP", body_extra=body,
+        plugs_dir,
+        type_sub="App",
+        name="myapp",
+        class_name="MyApp",
+        plug_type="APP",
+        body_extra=body,
     )
     env = _make_env(tmp_path, FIN_APP="myapp")
     res = resolve("echo", ["a", "b", "c"], env)
@@ -118,13 +138,17 @@ def test_resolve_passes_args_to_handler(plugs_dir, plug_factory, tmp_path):
 
 
 def test_fin_plugs_aux_resolution(plugs_dir, plug_factory, tmp_path):
-    body = '''
+    body = """
     def commands(self):
         return {"auxcmd": PlugCommand("auxcmd", lambda ctx, args: 11)}
-'''
+"""
     plug_factory(
-        plugs_dir, type_sub="Asset", name="auxplug", class_name="Aux",
-        plug_type="ASSET", body_extra=body,
+        plugs_dir,
+        type_sub="Asset",
+        name="auxplug",
+        class_name="Aux",
+        plug_type="ASSET",
+        body_extra=body,
     )
     env = _make_env(tmp_path, FIN_PLUGS="auxplug")
     res = resolve("auxcmd", [], env)

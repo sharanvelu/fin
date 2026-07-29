@@ -59,5 +59,8 @@ def asset(args: list[str]) -> int:
                 warning(f"Could not {sub} {c.name}: {exc}")
         return EXIT_OK
 
-    error(f"Unknown 'asset' subcommand: {sub}. Use up | stop | down.", title="Invalid Argument")
+    error(
+        f"Unknown 'asset' subcommand: {sub}. Use up | stop | down.",
+        title="Invalid Argument",
+    )
     return EXIT_USER

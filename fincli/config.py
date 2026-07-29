@@ -71,11 +71,11 @@ class Config:
     # --- Label keys ---------------------------------------------------------
     #: Every Fin container carries these labels. Values are documented in
     #: :mod:`fincli.core.containers`.
-    LABEL_TYPE: str = "FIN_TYPE"          # app | asset | global | proxy
-    LABEL_SERVICE: str = "FIN_SERVICE"    # web | mysql | redis | postgres ...
-    LABEL_SITE: str = "FIN_SITE"          # the routed URL, or "-"
-    LABEL_PROJECT: str = "FIN_PROJECT"    # project name (cwd basename)
-    LABEL_MANAGED: str = "FIN_MANAGED"    # always "true" — the master filter
+    LABEL_TYPE: str = "FIN_TYPE"  # app | asset | global | proxy
+    LABEL_SERVICE: str = "FIN_SERVICE"  # web | mysql | redis | postgres ...
+    LABEL_SITE: str = "FIN_SITE"  # the routed URL, or "-"
+    LABEL_PROJECT: str = "FIN_PROJECT"  # project name (cwd basename)
+    LABEL_MANAGED: str = "FIN_MANAGED"  # always "true" — the master filter
 
     # --- Proxy --------------------------------------------------------------
     #: Traefik proxy image and the container name it runs under.

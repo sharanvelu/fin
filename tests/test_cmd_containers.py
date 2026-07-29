@@ -34,11 +34,14 @@ def test_ps_lists(monkeypatch):
 def test_ps_renders_grouped(monkeypatch):
     """ps drives the grouped renderer over the listed containers."""
     app = make_fake_container(
-        name="myapp-web", status="running",
+        name="myapp-web",
+        status="running",
         labels={"FIN_TYPE": "app", "FIN_SERVICE": "web"},
     )
     asset = make_fake_container(
-        name="fin_redis", status="running", id="redis00000001",
+        name="fin_redis",
+        status="running",
+        id="redis00000001",
         labels={"FIN_TYPE": "asset", "FIN_SERVICE": "redis"},
     )
     captured = {}

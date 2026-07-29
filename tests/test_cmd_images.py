@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import images as im
@@ -16,15 +15,21 @@ from conftest import make_fake_image
 # --------------------------------------------------------------------------- #
 def test_fin_image_refs_includes_proxy(monkeypatch, tmp_path):
     import fincli.plugs.loader as loader
+
     monkeypatch.setattr(loader, "load_all", lambda: [])
-    monkeypatch.setattr(im.ProjectEnv, "load",
-                        classmethod(lambda cls: im.ProjectEnv(cwd=tmp_path, values={})))
+    monkeypatch.setattr(
+        im.ProjectEnv,
+        "load",
+        classmethod(lambda cls: im.ProjectEnv(cwd=tmp_path, values={})),
+    )
     refs = im._fin_image_refs()
     assert Config.PROXY_IMAGE in refs
 
 
 def test_fin_images_filters_to_wanted(monkeypatch, patch_docker, tmp_path):
-    monkeypatch.setattr(im, "_fin_image_refs", lambda: {"mysql:8.0", Config.PROXY_IMAGE})
+    monkeypatch.setattr(
+        im, "_fin_image_refs", lambda: {"mysql:8.0", Config.PROXY_IMAGE}
+    )
     wanted = make_fake_image(tags=["mysql:8.0"])
     other = make_fake_image(tags=["nginx:latest"])
     repo_match = make_fake_image(tags=["mysql:5.7"])  # repo matches "mysql"

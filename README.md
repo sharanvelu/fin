@@ -559,9 +559,10 @@ bash packaging/build.sh
 must be importable so PyInstaller can bundle them.
 
 > **PyInstaller cannot cross-compile** — each `fin-<os>-<arch>.tar.gz` must be
-> built on its own native OS/arch. `.github/workflows/release.yml` does this on a
-> matrix of runners (`macos-14` arm64, `macos-13` x64, `ubuntu-latest` x64,
-> `ubuntu-24.04-arm` arm64), triggered by pushing a `v*` tag, and attaches each
+> built on its own native OS/arch. `.github/workflows/build.yml` does this on a
+> matrix of runners (`macos-14` arm64, `ubuntu-latest` x64, `ubuntu-24.04-arm`
+> arm64), triggered by bumping `version` in `pyproject.toml` on master (which
+> makes `tag.yml` create the `v*` tag and dispatch the build), and attaches each
 > tarball to the GitHub Release that `install.sh` downloads from.
 
 > **macOS signing.** The published binary is unsigned, so `install.sh` strips the

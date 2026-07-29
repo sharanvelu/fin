@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from fincli.config import Config
 from fincli.core.docker_client import get_docker
@@ -229,10 +229,14 @@ def _friendly_run_error(exc: Exception, *, name: str, ports: dict | None) -> Exc
     the caller still renders a clean panel rather than a traceback.
     """
     message = str(getattr(exc, "explanation", None) or exc)
-    if "port is already allocated" in message or "address already in use" in message.lower():
-        host_ports = ", ".join(
-            str(v) for v in (ports or {}).values() if v is not None
-        ) or "its published ports"
+    if (
+        "port is already allocated" in message
+        or "address already in use" in message.lower()
+    ):
+        host_ports = (
+            ", ".join(str(v) for v in (ports or {}).values() if v is not None)
+            or "its published ports"
+        )
         return FinError(
             f"Could not start [bold]{name}[/bold]: {host_ports} already in use.\n"
             "Another process (often another local reverse proxy, or a system "
@@ -241,4 +245,6 @@ def _friendly_run_error(exc: Exception, *, name: str, ports: dict | None) -> Exc
             "that port, or remove the conflicting container.",
             title="Port In Use",
         )
-    return FinError(f"Could not start {name}: {message}", title="Container Start Failed")
+    return FinError(
+        f"Could not start {name}: {message}", title="Container Start Failed"
+    )

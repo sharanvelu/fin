@@ -43,6 +43,7 @@ def test_ensure_proxy_runs_traefik(monkeypatch, patch_docker):
     def fake_run(**kwargs):
         captured.update(kwargs)
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=True)
 
     monkeypatch.setattr(proxy, "run_container", fake_run)
@@ -65,6 +66,7 @@ def test_plug_context_primary_name(tmp_path):
 
 def test_plug_context_exec_not_running(monkeypatch, tmp_path):
     import fincli.plugs.context as ctxmod
+
     c = make_fake_container(name="demo-web", status="exited")
     monkeypatch.setattr(ctxmod, "find_primary", lambda project, service: c)
     ctx = PlugContext(env=_env(tmp_path), project="demo")
@@ -126,21 +128,31 @@ def test_ensure_database_no_db_noop(monkeypatch, tmp_path):
 def test_ensure_database_mysql(monkeypatch, tmp_path):
     called = []
     monkeypatch.setattr(db, "_ensure_mysql_database", lambda d: called.append(d))
-    monkeypatch.setattr(db, "_ensure_postgres_database", lambda d: pytest.fail("wrong engine"))
-    db.ensure_project_database(_env(tmp_path, DB_CONNECTION="mysql", DB_DATABASE="mydb"))
+    monkeypatch.setattr(
+        db, "_ensure_postgres_database", lambda d: pytest.fail("wrong engine")
+    )
+    db.ensure_project_database(
+        _env(tmp_path, DB_CONNECTION="mysql", DB_DATABASE="mydb")
+    )
     assert called == ["mydb"]
 
 
 def test_ensure_database_postgres(monkeypatch, tmp_path):
     called = []
     monkeypatch.setattr(db, "_ensure_postgres_database", lambda d: called.append(d))
-    db.ensure_project_database(_env(tmp_path, DB_CONNECTION="pgsql", DB_DATABASE="pgdb"))
+    db.ensure_project_database(
+        _env(tmp_path, DB_CONNECTION="pgsql", DB_DATABASE="pgdb")
+    )
     assert called == ["pgdb"]
 
 
 def test_ensure_database_sqlite_skipped(monkeypatch, tmp_path):
-    monkeypatch.setattr(db, "_ensure_mysql_database", lambda d: pytest.fail("should skip"))
-    monkeypatch.setattr(db, "_ensure_postgres_database", lambda d: pytest.fail("should skip"))
+    monkeypatch.setattr(
+        db, "_ensure_mysql_database", lambda d: pytest.fail("should skip")
+    )
+    monkeypatch.setattr(
+        db, "_ensure_postgres_database", lambda d: pytest.fail("should skip")
+    )
     db.ensure_project_database(_env(tmp_path, DB_CONNECTION="sqlite", DB_DATABASE="x"))
 
 
@@ -166,7 +178,11 @@ def test_ensure_mysql_database_execs(monkeypatch):
 
 
 def test_ensure_mysql_database_container_missing(monkeypatch):
-    monkeypatch.setattr(db, "find_container", lambda name: (_ for _ in ()).throw(Exception("no container")))
+    monkeypatch.setattr(
+        db,
+        "find_container",
+        lambda name: (_ for _ in ()).throw(Exception("no container")),
+    )
     # Should warn and return without raising.
     db._ensure_mysql_database("mydb")
 
@@ -181,8 +197,8 @@ def test_ensure_postgres_database_creates_when_absent(monkeypatch):
     # 1st exec_run = pg_database existence probe (empty -> does NOT exist),
     # 2nd exec_run = CREATE DATABASE.
     c.exec_run.side_effect = [
-        _exec_result(0, b""),   # existence check returns no rows
-        _exec_result(0, b""),   # create succeeds
+        _exec_result(0, b""),  # existence check returns no rows
+        _exec_result(0, b""),  # create succeeds
     ]
     monkeypatch.setattr(db, "find_container", lambda name: c)
     monkeypatch.setattr(db, "wait_for_ready", lambda container, **kw: True)

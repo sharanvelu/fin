@@ -35,8 +35,13 @@ class PlugContext:
         """Name of the project's primary container."""
         return primary_container_name(self.project, self.service)
 
-    def exec(self, cmd: list[str] | str, *, workdir: str | None = None,
-             interactive: bool = False) -> int:
+    def exec(
+        self,
+        cmd: list[str] | str,
+        *,
+        workdir: str | None = None,
+        interactive: bool = False,
+    ) -> int:
         """Exec *cmd* inside the project's primary container.
 
         Returns the command's exit code. Warns and returns 1 if the container
@@ -56,7 +61,9 @@ class PlugContext:
 
         container = find_primary(self.project, self.service)
         if container.status != "running":
-            warning(f"Container '{self.primary_name}' is not running. Run 'fin up' first.")
+            warning(
+                f"Container '{self.primary_name}' is not running. Run 'fin up' first."
+            )
             return 1
 
         if interactive:

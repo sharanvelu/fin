@@ -8,7 +8,6 @@ project directory, and calls Docker. Plugs never touch the daemon.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fincli.config import Config
@@ -137,9 +136,7 @@ def start_asset(spec: ContainerSpec, fin_type: str = "asset") -> Any:
     name = spec.container_name or f"fin_{spec.service}"
     site = "-"
     labels = base_labels(
-        fin_type=fin_type,
-        service=spec.service,
-        site=site, project="-"
+        fin_type=fin_type, service=spec.service, site=site, project="-"
     )
     if spec.web_exposed and spec.web_port:
         # Asset web UIs (e.g. a proxy dashboard) may route via a fixed host.

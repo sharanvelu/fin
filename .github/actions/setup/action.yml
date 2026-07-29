@@ -1,0 +1,49 @@
+# Shared toolchain setup used by every workflow: one place to change the
+# Python version / install strategy so individual workflows can't drift.
+#
+# Installs the project editable with its dev extras (pytest, pytest-cov, ruff,
+# mypy) by default; pass extra pip packages via `extra-packages` and disable
+# the project install with `install-project: "false"` for jobs that only need
+# standalone tools.
+
+name: Setup Python toolchain
+description: Install Python with pip caching, then fincli + dev dependencies.
+
+inputs:
+  python-version:
+    description: Python version to install.
+    required: false
+    default: "3.11"
+  install-project:
+    description: Whether to `pip install -e ".[dev]"` (set "false" to skip).
+    required: false
+    default: "true"
+  extra-packages:
+    description: Extra pip packages to install (space-separated), e.g. "build twine".
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Python ${{ inputs.python-version }}
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: pyproject.toml
+
+    - name: Install dependencies
+      shell: bash
+      env:
+        INSTALL_PROJECT: ${{ inputs.install-project }}
+        EXTRA_PACKAGES: ${{ inputs.extra-packages }}
+      run: |
+        python -m pip install --upgrade pip
+        if [ "$INSTALL_PROJECT" = "true" ]; then
+          python -m pip install -e ".[dev]"
+        fi
+        if [ -n "$EXTRA_PACKAGES" ]; then
+          # shellcheck disable=SC2086  # intentional word-splitting of the package list
+          python -m pip install $EXTRA_PACKAGES
+        fi

@@ -69,8 +69,7 @@ def wait_for_ready(
                 break
             sleep(interval)
     warning(
-        f"{description} did not become ready within {timeout:g}s; "
-        "continuing anyway."
+        f"{description} did not become ready within {timeout:g}s; continuing anyway."
     )
     return False
 

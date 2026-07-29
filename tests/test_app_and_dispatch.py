@@ -39,8 +39,11 @@ def test_dispatch_version():
 
 
 def test_dispatch_unknown_command(monkeypatch, tmp_path):
-    monkeypatch.setattr(main_mod.ProjectEnv, "load",
-                        classmethod(lambda cls: main_mod.ProjectEnv(cwd=tmp_path, values={})))
+    monkeypatch.setattr(
+        main_mod.ProjectEnv,
+        "load",
+        classmethod(lambda cls: main_mod.ProjectEnv(cwd=tmp_path, values={})),
+    )
     monkeypatch.setattr(main_mod, "resolve", lambda name, args, env: None)
     assert main_mod._dispatch(["bogus"]) == EXIT_USER
 
@@ -48,8 +51,11 @@ def test_dispatch_unknown_command(monkeypatch, tmp_path):
 def test_dispatch_runs_resolution(monkeypatch, tmp_path):
     from fincli.resolver import Resolution
 
-    monkeypatch.setattr(main_mod.ProjectEnv, "load",
-                        classmethod(lambda cls: main_mod.ProjectEnv(cwd=tmp_path, values={})))
+    monkeypatch.setattr(
+        main_mod.ProjectEnv,
+        "load",
+        classmethod(lambda cls: main_mod.ProjectEnv(cwd=tmp_path, values={})),
+    )
     res = Resolution(kind="reserved", run=lambda: 0, source="system")
     monkeypatch.setattr(main_mod, "resolve", lambda name, args, env: res)
     assert main_mod._dispatch(["up"]) == EXIT_OK

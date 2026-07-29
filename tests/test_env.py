@@ -30,13 +30,7 @@ def test_parse_env_file_basic_pairs(tmp_path):
 
 def test_parse_env_file_comments_blank_and_export(tmp_path):
     p = tmp_path / ".env"
-    p.write_text(
-        "# a comment\n"
-        "\n"
-        "   \n"
-        "export FIN_APP=laravel\n"
-        "FIN_PLUGS=mysql,redis\n"
-    )
+    p.write_text("# a comment\n\n   \nexport FIN_APP=laravel\nFIN_PLUGS=mysql,redis\n")
     parsed = parse_env_file(p)
     assert parsed == {"FIN_APP": "laravel", "FIN_PLUGS": "mysql,redis"}
 
@@ -46,14 +40,14 @@ def test_parse_env_file_strips_matching_quotes(tmp_path):
     p.write_text(
         'A="double"\n'
         "B='single'\n"
-        'C="mismatch\'\n'      # not matching → kept verbatim
-        'D=no_quotes\n'
-        'E=""\n'               # empty quoted → empty string
+        "C=\"mismatch'\n"  # not matching → kept verbatim
+        "D=no_quotes\n"
+        'E=""\n'  # empty quoted → empty string
     )
     parsed = parse_env_file(p)
     assert parsed["A"] == "double"
     assert parsed["B"] == "single"
-    assert parsed["C"] == '"mismatch\''
+    assert parsed["C"] == "\"mismatch'"
     assert parsed["D"] == "no_quotes"
     assert parsed["E"] == ""
 
@@ -164,7 +158,9 @@ def test_project_name_override(tmp_path):
 # plugs / app_plug
 # --------------------------------------------------------------------------- #
 def test_plugs_parsing_and_whitespace():
-    env = ProjectEnv(cwd=__import__("pathlib").Path("/x"), values={"FIN_PLUGS": " mysql , redis ,, "})
+    env = ProjectEnv(
+        cwd=__import__("pathlib").Path("/x"), values={"FIN_PLUGS": " mysql , redis ,, "}
+    )
     assert env.plugs == ["mysql", "redis"]
 
 
@@ -174,12 +170,17 @@ def test_plugs_empty():
 
 
 def test_app_plug_prefers_fin_app():
-    env = ProjectEnv(cwd=__import__("pathlib").Path("/x"), values={"FIN_APP": "laravel", "FIN_PLUG": "other"})
+    env = ProjectEnv(
+        cwd=__import__("pathlib").Path("/x"),
+        values={"FIN_APP": "laravel", "FIN_PLUG": "other"},
+    )
     assert env.app_plug == "laravel"
 
 
 def test_app_plug_falls_back_to_fin_plug():
-    env = ProjectEnv(cwd=__import__("pathlib").Path("/x"), values={"FIN_PLUG": "django"})
+    env = ProjectEnv(
+        cwd=__import__("pathlib").Path("/x"), values={"FIN_PLUG": "django"}
+    )
     assert env.app_plug == "django"
 
 
@@ -264,11 +265,13 @@ def test_envvar_bool_invalid():
 # EnvSpec.validate / resolved
 # --------------------------------------------------------------------------- #
 def test_envspec_validate_collects_all_problems():
-    spec = EnvSpec.of([
-        EnvVar("FIN_SITE", required=True),
-        EnvVar("FIN_COMPOSER_VERSION", choices=("1", "2")),
-        EnvVar("FIN_PORT", value_type=int),
-    ])
+    spec = EnvSpec.of(
+        [
+            EnvVar("FIN_SITE", required=True),
+            EnvVar("FIN_COMPOSER_VERSION", choices=("1", "2")),
+            EnvVar("FIN_PORT", value_type=int),
+        ]
+    )
     with pytest.raises(FinError) as exc:
         spec.validate({"FIN_COMPOSER_VERSION": "3", "FIN_PORT": "abc"})
     msg = exc.value.message
@@ -290,11 +293,13 @@ def test_envspec_validate_accepts_projectenv():
 
 
 def test_envspec_resolved_applies_defaults():
-    spec = EnvSpec.of([
-        EnvVar("FIN_PHP_VERSION", default="latest"),
-        EnvVar("FIN_COMPOSER_VERSION", default="2"),
-        EnvVar("FIN_SITE", required=True),
-    ])
+    spec = EnvSpec.of(
+        [
+            EnvVar("FIN_PHP_VERSION", default="latest"),
+            EnvVar("FIN_COMPOSER_VERSION", default="2"),
+            EnvVar("FIN_SITE", required=True),
+        ]
+    )
     out = spec.resolved({"FIN_SITE": "app.localhost"})
     assert out["FIN_PHP_VERSION"] == "latest"
     assert out["FIN_COMPOSER_VERSION"] == "2"

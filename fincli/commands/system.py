@@ -49,7 +49,9 @@ def up(args: list[str]) -> int:
 
     lp = load_by_name(app_plug_name)
     if lp is None:
-        raise FinError(f"App plug '{app_plug_name}' is not installed.", title="Plug Not Found")
+        raise FinError(
+            f"App plug '{app_plug_name}' is not installed.", title="Plug Not Found"
+        )
     if lp.plug_type != PlugType.APP:
         raise FinError(
             f"Plug '{app_plug_name}' is type {lp.plug_type.value}, not APP.",

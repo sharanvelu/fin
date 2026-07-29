@@ -62,7 +62,9 @@ def _list() -> int:
             "[green]yes[/green]" if present else "-",
         )
     console.print(table)
-    hint(r"Run 'fin agents install \[agent ...|all]' inside a project to generate them.")
+    hint(
+        r"Run 'fin agents install \[agent ...|all]' inside a project to generate them."
+    )
     return EXIT_OK
 
 

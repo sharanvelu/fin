@@ -1,0 +1,34 @@
+# Weekly dependency updates. Minor + patch bumps are grouped into ONE PR per
+# ecosystem (auto-merged by dependabot-auto-merge.yml once required checks
+# pass); majors arrive individually and stay manual. The "chore(deps)" prefix
+# keeps PR titles passing the Conventional Commits check (pr-title.yml).
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      python-minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7

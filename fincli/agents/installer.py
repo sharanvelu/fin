@@ -17,13 +17,7 @@ END_MARK = "<!-- fin:agents:end -->"
 
 
 def _render_block(body: str) -> str:
-    return (
-        f"{BEGIN_MARK}\n"
-        f"<!-- {GENERATED_NOTE} -->\n"
-        "\n"
-        f"{body.rstrip()}\n"
-        f"{END_MARK}\n"
-    )
+    return f"{BEGIN_MARK}\n<!-- {GENERATED_NOTE} -->\n\n{body.rstrip()}\n{END_MARK}\n"
 
 
 def merge_managed(existing: str | None, body: str) -> str:

@@ -61,9 +61,7 @@ def _plug_lookup_order(env: ProjectEnv) -> list[LoadedPlug]:
     return ordered
 
 
-def _find_plug_command(
-    plug: FinPlug, name: str
-) -> PlugCommand | None:
+def _find_plug_command(plug: FinPlug, name: str) -> PlugCommand | None:
     """Find a command (by name or alias) within a plug."""
     commands = plug.commands()
     if name in commands:
@@ -95,7 +93,7 @@ def resolve(name: str, args: list[str], env: ProjectEnv) -> Resolution | None:
             ctx = PlugContext(env=env, project=project)
             return Resolution(
                 kind="plug",
-                run=lambda pc=plug_cmd, c=ctx: pc.handler(c, args),
+                run=lambda: plug_cmd.handler(ctx, args),
                 source=lp.instance.name,
             )
 

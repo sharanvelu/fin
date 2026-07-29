@@ -33,7 +33,7 @@ class PlugRecord:
     version: str
     plug_type: str
     description: str
-    commands: str   # comma-separated
+    commands: str  # comma-separated
     path: str
 
 
@@ -204,7 +204,9 @@ class Registry:
 
 
 def _looks_like_git(value: str) -> bool:
-    return value.startswith(("http://", "https://", "git@", "ssh://")) or value.endswith(".git")
+    return value.startswith(
+        ("http://", "https://", "git@", "ssh://")
+    ) or value.endswith(".git")
 
 
 def _repo_basename(url: str) -> str:

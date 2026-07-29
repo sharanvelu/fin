@@ -17,7 +17,7 @@ fin                       bash launcher (source/dev path; sets PYTHONPATH, execs
 install.sh                installer for END USERS: downloads a prebuilt binary from Releases, symlinks it, seeds plugs
 packaging/build.sh        builds the standalone binary (PyInstaller onedir) → dist/fin-<os>-<arch>.tar.gz
 packaging/fin_entry.py    PyInstaller entry point (calls fincli.__main__:main)
-.github/workflows/release.yml  CI matrix: build the binary per OS/arch on a v* tag, attach tarballs to the Release
+.github/workflows/            CI: PR gates (tests, code-style, static-analysis, build-check) + release (tag.yml → build.yml)
 pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: typer, rich, docker; dev: pytest, pytest-mock
 fincli/
   __main__.py             entrypoint + argv dispatch (main())
