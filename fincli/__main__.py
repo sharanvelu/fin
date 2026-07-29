@@ -26,7 +26,7 @@ from fincli.resolver import resolve
 @handle_errors
 def _dispatch(argv: list[str]) -> int:
     """Resolve and run a single command invocation."""
-    from fincli.help import HELP_FLAGS, print_command_help, print_overview, wants_help
+    from fincli.help import HELP_FLAGS, print_overview, wants_help
 
     # No args, or a bare help/-h/--help → top-level overview.
     if not argv or argv[0] in HELP_FLAGS:

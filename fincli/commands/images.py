@@ -11,7 +11,7 @@ from fincli.commands import reserved
 from fincli.config import Config
 from fincli.core.docker_client import get_docker
 from fincli.core.env import ProjectEnv
-from fincli.ui.console import confirm, console, error, info, success, warning
+from fincli.ui.console import confirm, console, error, info, success
 from fincli.ui.tables import make_image_table
 
 
@@ -95,5 +95,8 @@ def images(args: list[str]) -> int:
         success(f"Pruned dangling images, reclaimed {reclaimed / 1_048_576:.1f} MB")
         return EXIT_OK
 
-    error(f"Unknown 'images' subcommand: {sub}. Use ls | rm | prune.", title="Invalid Argument")
+    error(
+        f"Unknown 'images' subcommand: {sub}. Use ls | rm | prune.",
+        title="Invalid Argument",
+    )
     return EXIT_USER

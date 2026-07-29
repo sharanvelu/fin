@@ -257,6 +257,34 @@ delegated to a plug.
 | `fin plugs install <name\|git-url>` | Install a plug from a git URL (catalog install pending). |
 | `fin plugs uninstall <name>` | Remove an installed plug from disk. |
 
+### AI agents
+
+Fin can generate instruction files that teach AI coding agents (Claude Code,
+Cursor, Codex, GitHub Copilot, …) to run project commands through `fin`
+(`fin composer install`, never bare `composer install`). The content is
+tailored to the project: command tables are built from the installed plugs'
+`commands()` metadata. Commit the generated files so every teammate's agent
+picks them up; re-run after changing `FIN_APP`/`FIN_PLUGS` or upgrading plugs.
+
+| Command | Description |
+| ------- | ----------- |
+| `fin agents list` (alias `ls`) | List supported agents, the file each one writes, and whether it's present. |
+| `fin agents install [agent ...\|all]` | Generate instruction files into the current project. Default set: `claude` (`.claude/skills/fin-commands/SKILL.md`), `cursor` (`.cursor/rules/fin-commands.mdc`), `codex` (`AGENTS.md`). More via `all` or by name — see below. |
+
+Supported targets: `claude`, `cursor`, `codex`, `opencode`, `kilocode`,
+`kimi`, `antigravity`, `copilot-cli` (these six all read the cross-agent
+`AGENTS.md` natively, so they share one file), `copilot` (VS Code Copilot
+Chat & coding agent — `.github/copilot-instructions.md`), `gemini`
+(`GEMINI.md`), `codebuddy` (`.codebuddy/rules/fin-commands.md`), and `aider`
+(`CONVENTIONS.md` plus a `.aider.conf.yml` with `read: CONVENTIONS.md`,
+created only if the conf doesn't already exist).
+
+Fin-owned files (the Claude skill, the Cursor and CodeBuddy rules) are
+rewritten whole. Shared files (`AGENTS.md`, `GEMINI.md`, Copilot
+instructions, `CONVENTIONS.md`) are only touched inside a
+`<!-- fin:agents:begin/end -->` marker block — hand-written content around the
+block survives every re-run.
+
 ### Laravel plug
 
 Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):
@@ -531,9 +559,10 @@ bash packaging/build.sh
 must be importable so PyInstaller can bundle them.
 
 > **PyInstaller cannot cross-compile** — each `fin-<os>-<arch>.tar.gz` must be
-> built on its own native OS/arch. `.github/workflows/release.yml` does this on a
-> matrix of runners (`macos-14` arm64, `macos-13` x64, `ubuntu-latest` x64,
-> `ubuntu-24.04-arm` arm64), triggered by pushing a `v*` tag, and attaches each
+> built on its own native OS/arch. `.github/workflows/build.yml` does this on a
+> matrix of runners (`macos-14` arm64, `ubuntu-latest` x64, `ubuntu-24.04-arm`
+> arm64), triggered by bumping `version` in `pyproject.toml` on master (which
+> makes `tag.yml` create the `v*` tag and dispatch the build), and attaches each
 > tarball to the GitHub Release that `install.sh` downloads from.
 
 > **macOS signing.** The published binary is unsigned, so `install.sh` strips the

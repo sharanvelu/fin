@@ -13,7 +13,7 @@
 # Env:    FIN_VERSION  version label for logging (default: from pyproject.toml)
 #
 # Note: PyInstaller cannot cross-compile — run this on each target OS/arch
-# (see .github/workflows/release.yml for the CI matrix).
+# (see .github/workflows/build.yml for the CI matrix).
 
 set -euo pipefail
 

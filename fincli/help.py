@@ -64,7 +64,11 @@ def print_overview() -> None:
         table.add_column("Aliases", style="magenta")
         table.add_column("Description")
         for cmd in sorted(groups[group_name], key=lambda c: c.name):
-            table.add_row(escape(cmd.name), escape(", ".join(cmd.aliases) or "-"), escape(cmd.help))
+            table.add_row(
+                escape(cmd.name),
+                escape(", ".join(cmd.aliases) or "-"),
+                escape(cmd.help),
+            )
         console.print(table)
 
     # Plug commands, grouped by plug (only if any plugs are loaded).
@@ -81,7 +85,7 @@ def _print_plug_overview() -> None:
     try:
         from fincli.plugs.loader import load_all
 
-        env = ProjectEnv.load()
+        ProjectEnv.load()
     except Exception:  # noqa: BLE001 - overview must never crash
         return
 
@@ -98,7 +102,9 @@ def _print_plug_overview() -> None:
 
     for plug, cmds in relevant:
         title = f"Plug: {escape(plug.name)}"
-        table = Table(title=title, header_style="bold cyan", title_justify="left", expand=False)
+        table = Table(
+            title=title, header_style="bold cyan", title_justify="left", expand=False
+        )
         table.add_column("Command", style="bold")
         table.add_column("Aliases", style="magenta")
         table.add_column("Description")
@@ -107,7 +113,11 @@ def _print_plug_overview() -> None:
             if cmd.name in seen:
                 continue
             seen.add(cmd.name)
-            table.add_row(escape(cmd.name), escape(", ".join(cmd.aliases) or "-"), escape(cmd.help))
+            table.add_row(
+                escape(cmd.name),
+                escape(", ".join(cmd.aliases) or "-"),
+                escape(cmd.help),
+            )
         console.print(table)
 
 
@@ -141,7 +151,11 @@ def _print_reserved_help(cmd) -> None:
     legitimately contain ``[...]`` (e.g. ``[asset|all]``); these are escaped so
     Rich does not mistake them for markup tags and silently drop them.
     """
-    aliases = f"  [dim](aliases: {escape(', '.join(cmd.aliases))})[/dim]" if cmd.aliases else ""
+    aliases = (
+        f"  [dim](aliases: {escape(', '.join(cmd.aliases))})[/dim]"
+        if cmd.aliases
+        else ""
+    )
     usage = cmd.usage or f"fin {cmd.name} [args...]"
     body_lines = [
         f"[bold cyan]fin {escape(cmd.name)}[/bold cyan]{aliases}",
@@ -160,7 +174,12 @@ def _print_reserved_help(cmd) -> None:
     )
 
     if cmd.subcommands:
-        table = Table(title="Subcommands", header_style="bold cyan", title_justify="left", expand=False)
+        table = Table(
+            title="Subcommands",
+            header_style="bold cyan",
+            title_justify="left",
+            expand=False,
+        )
         table.add_column("Subcommand", style="bold")
         table.add_column("Description")
         for sub_name, sub_help in cmd.subcommands:
@@ -168,7 +187,12 @@ def _print_reserved_help(cmd) -> None:
         console.print(table)
 
     if cmd.options:
-        table = Table(title="Options", header_style="bold cyan", title_justify="left", expand=False)
+        table = Table(
+            title="Options",
+            header_style="bold cyan",
+            title_justify="left",
+            expand=False,
+        )
         table.add_column("Flag", style="magenta")
         table.add_column("Description")
         for flag, flag_help in cmd.options:
@@ -204,7 +228,11 @@ def _print_plug_command_help(name: str, env: ProjectEnv) -> bool:
         if match is None:
             continue
 
-        aliases = f"  [dim](aliases: {escape(', '.join(match.aliases))})[/dim]" if match.aliases else ""
+        aliases = (
+            f"  [dim](aliases: {escape(', '.join(match.aliases))})[/dim]"
+            if match.aliases
+            else ""
+        )
         body = [
             f"[bold cyan]fin {escape(match.name)}[/bold cyan]{aliases}",
             f"[dim]from plug:[/dim] [magenta]{escape(plug.name)}[/magenta] v{escape(plug.version)}",
@@ -214,7 +242,12 @@ def _print_plug_command_help(name: str, env: ProjectEnv) -> bool:
             f"[dim]Usage:[/dim] [bold]fin {escape(match.name)} [args...][/bold]",
         ]
         console.print(
-            Panel("\n".join(body), border_style="cyan", title="[cyan]Plug Command Help[/cyan]", expand=False)
+            Panel(
+                "\n".join(body),
+                border_style="cyan",
+                title="[cyan]Plug Command Help[/cyan]",
+                expand=False,
+            )
         )
 
         # Show the plug's env requirements — useful context for plug commands.
@@ -234,7 +267,8 @@ def _print_plug_command_help(name: str, env: ProjectEnv) -> bool:
                 req = "[red]yes[/red]" if var.required else "no"
                 choices = (
                     f" [dim](one of: {escape(', '.join(var.choices))})[/dim]"
-                    if var.choices else ""
+                    if var.choices
+                    else ""
                 )
                 table.add_row(
                     escape(var.name),

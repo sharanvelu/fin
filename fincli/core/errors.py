@@ -17,7 +17,9 @@ from fincli.app import EXIT_SYSTEM, EXIT_USER
 class FinError(Exception):
     """A user-facing error. *exit_code* defaults to user-error (1)."""
 
-    def __init__(self, message: str, *, exit_code: int = EXIT_USER, title: str = "Error"):
+    def __init__(
+        self, message: str, *, exit_code: int = EXIT_USER, title: str = "Error"
+    ):
         super().__init__(message)
         self.message = message
         self.exit_code = exit_code
@@ -27,7 +29,9 @@ class FinError(Exception):
 class DockerUnavailable(FinError):
     """Raised when the Docker daemon cannot be reached."""
 
-    def __init__(self, message: str = "Could not connect to Docker. Is Docker running?"):
+    def __init__(
+        self, message: str = "Could not connect to Docker. Is Docker running?"
+    ):
         super().__init__(message, exit_code=EXIT_SYSTEM, title="Docker Unavailable")
 
 
@@ -50,7 +54,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Imported here so this module has no hard dependency on the docker SDK
         # at import time (keeps unit tests light).
-        from docker import errors as derr  # type: ignore
+        from docker import errors as derr
 
         from fincli.ui.console import error
 

@@ -20,7 +20,7 @@ def _empty_env(tmp_path):
 #: Body for a synthetic APP plug that contributes an `artisan` command (alias
 #: `art`) plus a FIN_SITE env var — enough to exercise the plug-command help
 #: renderer without depending on the external plugs repo.
-_SYNTH_PLUG_BODY = '''
+_SYNTH_PLUG_BODY = """
     def env_spec(self):
         from fincli.core.env import EnvSpec, EnvVar
         return EnvSpec.of([
@@ -35,7 +35,7 @@ _SYNTH_PLUG_BODY = '''
                 "artisan", _artisan, "Run an artisan command.", aliases=("art",)
             ),
         }
-'''
+"""
 
 
 @pytest.fixture
@@ -144,8 +144,9 @@ def test_command_help_plug_alias(capsys, tmp_path, synthetic_plug):
 def test_dispatch_command_help_flag(monkeypatch, tmp_path):
     # `fin config --help` should NOT run config; it should render help.
     ran = []
-    monkeypatch.setattr(main_mod, "resolve",
-                        lambda name, args, env: ran.append(name) or None)
+    monkeypatch.setattr(
+        main_mod, "resolve", lambda name, args, env: ran.append(name) or None
+    )
     code = main_mod._dispatch(["config", "--help"])
     assert code == EXIT_OK
     assert ran == []  # resolve/run never called

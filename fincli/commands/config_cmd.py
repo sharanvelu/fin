@@ -1,9 +1,9 @@
 """Config command: enable/disable/get/list default asset plugs.
 
-    fin config enable <asset>    mark an asset to auto-start with `up`
-    fin config disable <asset>   stop auto-starting it
-    fin config get <asset>       show one asset's status + details
-    fin config list              show all asset plugs and their status
+fin config enable <asset>    mark an asset to auto-start with `up`
+fin config disable <asset>   stop auto-starting it
+fin config get <asset>       show one asset's status + details
+fin config list              show all asset plugs and their status
 """
 
 from __future__ import annotations
@@ -76,7 +76,9 @@ def _get(name: str) -> int:
     plug = lp.instance
     enabled = is_asset_enabled(plug.name)
     info(f"[bold]{plug.name}[/bold] v{plug.version}")
-    console.print(f"  status:      {'[green]enabled[/green]' if enabled else '[red]disabled[/red]'}")
+    console.print(
+        f"  status:      {'[green]enabled[/green]' if enabled else '[red]disabled[/red]'}"
+    )
     console.print(f"  description: {plug.description or '-'}")
     console.print(f"  commands:    {', '.join(plug.commands().keys()) or '-'}")
     return EXIT_OK

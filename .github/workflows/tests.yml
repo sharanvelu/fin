@@ -1,0 +1,121 @@
+# Test suite for every PR.
+#
+# Required status check: "Tests Gate" (make ONLY the gate required — the work
+# jobs are path-filtered and may legitimately be skipped, which would wedge a
+# PR if they were required directly).
+#
+# Layout ("changes → work → gate"):
+#   changes  detects whether Python code changed (forced true on dispatch)
+#   tests    hermetic unit suite (Docker SDK mocked) across supported Pythons,
+#            with a coverage ratchet — fails under the floor in pyproject.toml
+#            ([tool.coverage.report] fail_under). Raise the floor as coverage
+#            grows; never lower it.
+#   smoke    exercises the CLI against the REAL Docker daemon available on
+#            GitHub-hosted Ubuntu runners (the unit suite never touches it)
+#   gate     always runs; fails iff a needed job failed or was cancelled
+
+name: tests
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python || 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # On workflow_dispatch there is no PR diff — the step is skipped and the
+      # `|| 'true'` fallback above forces every domain on.
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            python:
+              - 'fincli/**'
+              - 'tests/**'
+              - 'packaging/fin_entry.py'
+              - 'pyproject.toml'
+              - '.github/workflows/tests.yml'
+              - '.github/actions/setup/**'
+
+  tests:
+    name: tests (py${{ matrix.python }})
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run tests with coverage floor
+        # The suite is hermetic — it mocks the Docker SDK, so no daemon is
+        # needed. --cov enforces [tool.coverage.report] fail_under.
+        run: python -m pytest --cov
+
+  smoke:
+    name: CLI smoke vs real Docker
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      # Production parity the unit suite can't give: a real SDK connection to
+      # a live daemon (socket detection, ping, container listing).
+      - name: fin --help renders
+        run: python -m fincli --help
+
+      - name: fin ps talks to the daemon
+        run: python -m fincli ps -a
+
+  gate:
+    name: Tests Gate
+    needs: [changes, tests, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any needed job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: All good
+        run: echo "All jobs succeeded or were skipped as not relevant."

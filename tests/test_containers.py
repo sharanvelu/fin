@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from fincli.config import Config
-from fincli.core import containers as cmod
 from fincli.core.containers import (
     base_labels,
     ensure_network,
@@ -27,7 +26,9 @@ from conftest import make_fake_container
 # base_labels
 # --------------------------------------------------------------------------- #
 def test_base_labels_full():
-    labels = base_labels(fin_type="app", service="web", site="http://app.localhost", project="demo")
+    labels = base_labels(
+        fin_type="app", service="web", site="http://app.localhost", project="demo"
+    )
     assert labels == {
         "FIN_MANAGED": "true",
         "FIN_TYPE": "app",
@@ -105,7 +106,10 @@ def test_traefik_labels_wildcard_rule():
     labels = traefik_labels("*.example.localhost", 8080)
     key = "example"
     assert labels[f"traefik.http.routers.{key}.rule"].startswith("HostRegexp(")
-    assert labels[f"traefik.http.services.{key}_service.loadbalancer.server.port"] == "8080"
+    assert (
+        labels[f"traefik.http.services.{key}_service.loadbalancer.server.port"]
+        == "8080"
+    )
 
 
 def test_traefik_labels_port_is_string():
@@ -146,7 +150,9 @@ def test_primary_container_name_custom_service():
 def test_ensure_network_creates_when_absent(patch_docker):
     patch_docker.networks.list.return_value = []
     ensure_network()
-    patch_docker.networks.create.assert_called_once_with(Config.NETWORK, driver="bridge")
+    patch_docker.networks.create.assert_called_once_with(
+        Config.NETWORK, driver="bridge"
+    )
 
 
 def test_ensure_network_noop_when_present(patch_docker):
@@ -257,7 +263,7 @@ def test_run_container_port_in_use_cleans_up_and_raises(patch_docker):
     # finds the half-created leftover and must force-remove it.
     leftover = make_fake_container(name="demo-web")
     patch_docker.containers.list.side_effect = [
-        [],          # initial existence check -> nothing
+        [],  # initial existence check -> nothing
         [leftover],  # _cleanup_failed lookup -> leftover to remove
     ]
     patch_docker.networks.list.return_value = [object()]

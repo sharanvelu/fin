@@ -60,7 +60,9 @@ def _resize(api: Any, exec_id: str) -> None:
         pass
 
 
-def interactive_exec(container: Any, cmd: list[str] | str, *, workdir: str | None = None) -> int:
+def interactive_exec(
+    container: Any, cmd: list[str] | str, *, workdir: str | None = None
+) -> int:
     """Run *cmd* as a fully interactive session inside *container*.
 
     Returns the command's exit code. Falls back to a streamed (non-interactive)

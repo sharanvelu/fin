@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from fincli.core import docker_client as dc
 from fincli.core.docker_client import DockerService, get_docker
@@ -69,9 +68,8 @@ def test_detect_socket_defers_to_docker_host(monkeypatch):
 
 def test_detect_socket_finds_existing(monkeypatch):
     monkeypatch.delenv("DOCKER_HOST", raising=False)
-    # Force exactly one candidate to "exist".
-    real_exists = dc.Path.exists
 
+    # Force exactly one candidate to "exist".
     def fake_exists(self):
         return str(self) == "/var/run/docker.sock"
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from fincli.config import Config
 from fincli.core import orchestrator as orch
@@ -32,14 +31,19 @@ def test_start_primary_applies_labels_and_mount(monkeypatch, patch_docker, tmp_p
     def fake_run(**kwargs):
         captured.update(kwargs)
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=True)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
     monkeypatch.setattr(orch, "ensure_network", lambda: None)
 
     spec = ContainerSpec(
-        service="web", image="demo:latest", name_suffix="web",
-        web_exposed=True, web_port=80, workdir_mount="/app",
+        service="web",
+        image="demo:latest",
+        name_suffix="web",
+        web_exposed=True,
+        web_port=80,
+        workdir_mount="/app",
     )
     env = _env(tmp_path / "myproj", FIN_SITE="app.localhost")
     (tmp_path / "myproj").mkdir()
@@ -60,6 +64,7 @@ def test_start_primary_no_traefik_without_site(monkeypatch, patch_docker, tmp_pa
     def fake_run(**kwargs):
         captured.update(kwargs)
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=False)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
@@ -69,12 +74,15 @@ def test_start_primary_no_traefik_without_site(monkeypatch, patch_docker, tmp_pa
     assert "traefik.enable" not in captured["labels"]
 
 
-def test_start_primary_installs_certs_when_opted_in(monkeypatch, patch_docker, tmp_path):
+def test_start_primary_installs_certs_when_opted_in(
+    monkeypatch, patch_docker, tmp_path
+):
     calls = []
     container = make_fake_container()
 
     def fake_run(**kwargs):
         from fincli.core.containers import RunResult
+
         return RunResult(container=container, created=True)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
@@ -91,6 +99,7 @@ def test_start_primary_skips_certs_by_default(monkeypatch, patch_docker, tmp_pat
 
     def fake_run(**kwargs):
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=True)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
@@ -106,14 +115,19 @@ def test_start_asset_installs_certs_when_opted_in(monkeypatch, patch_docker, tmp
 
     def fake_run(**kwargs):
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=True)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
     monkeypatch.setattr(orch, "ensure_network", lambda: None)
     monkeypatch.setattr(orch, "install_certs", lambda c, s: calls.append(s))
 
-    spec = ContainerSpec(service="mysql", image="mysql:8.0",
-                         container_name="fin_mysql", install_certs=True)
+    spec = ContainerSpec(
+        service="mysql",
+        image="mysql:8.0",
+        container_name="fin_mysql",
+        install_certs=True,
+    )
     orch.start_asset(spec)
     assert calls == [spec]
 
@@ -124,6 +138,7 @@ def test_start_asset_fixed_name(monkeypatch, patch_docker, tmp_path):
     def fake_run(**kwargs):
         captured.update(kwargs)
         from fincli.core.containers import RunResult
+
         return RunResult(container=make_fake_container(), created=True)
 
     monkeypatch.setattr(orch, "run_container", fake_run)
@@ -146,9 +161,13 @@ def test_resolve_enabled_assets_override(monkeypatch, tmp_path):
 
     monkeypatch.setattr(orch, "is_asset_enabled", lambda n: False, raising=False)
     import fincli.core.store as store
+
     monkeypatch.setattr(store, "is_asset_enabled", lambda n: False)
     import fincli.plugs.loader as loader
-    monkeypatch.setattr(loader, "load_by_name", lambda n: FakeLP() if n == "mysql" else None)
+
+    monkeypatch.setattr(
+        loader, "load_by_name", lambda n: FakeLP() if n == "mysql" else None
+    )
     monkeypatch.setattr(loader, "load_all", lambda: [])
 
     env = _env(tmp_path, FIN_OVERRIDE_ASSETS="mysql,ghost")
@@ -169,6 +188,7 @@ def test_resolve_enabled_assets_from_config(monkeypatch, tmp_path):
 
     import fincli.core.store as store
     import fincli.plugs.loader as loader
+
     monkeypatch.setattr(store, "is_asset_enabled", lambda n: n == "redis")
     monkeypatch.setattr(loader, "load_all", lambda: [FakeLP()])
     monkeypatch.setattr(loader, "load_by_name", lambda n: None)
@@ -192,7 +212,9 @@ def test_start_assets_for_starts_each(monkeypatch, tmp_path):
 
     monkeypatch.setattr(orch, "resolve_enabled_assets", lambda env: [FakeLP()])
     started_specs = []
-    monkeypatch.setattr(orch, "start_asset", lambda s: started_specs.append(s) or make_fake_container())
+    monkeypatch.setattr(
+        orch, "start_asset", lambda s: started_specs.append(s) or make_fake_container()
+    )
     result = orch.start_assets_for(_env(tmp_path))
     assert len(result) == 1
     assert started_specs == [spec]

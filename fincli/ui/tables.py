@@ -70,7 +70,7 @@ def _parse_docker_time(value: str) -> datetime | None:
                 if ch.isdigit():
                     frac += ch
                 else:
-                    tz = tail[len(frac):]
+                    tz = tail[len(frac) :]
                     break
             text = head + "." + frac[:6] + tz
         text = text.replace("Z", "+00:00")
@@ -378,7 +378,9 @@ def make_image_table(images: Iterable[Any], *, title: str | None = None) -> Tabl
         created = (img.attrs.get("Created", "") or "")[:19].replace("T", " ")
         for tag in tags:
             repo, _, tagname = tag.rpartition(":")
-            table.add_row(repo or "<none>", tagname or "<none>", img.short_id, size, created)
+            table.add_row(
+                repo or "<none>", tagname or "<none>", img.short_id, size, created
+            )
     return table
 
 

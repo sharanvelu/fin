@@ -17,10 +17,22 @@ def populated_plugs(tmp_path, monkeypatch, plug_factory):
         (plugs / sub).mkdir(parents=True)
     monkeypatch.setattr(Config, "PLUGS_DIR", plugs)
     monkeypatch.setattr(Config, "REGISTRY_DB", tmp_path / "registry.db")
-    plug_factory(plugs, type_sub="App", name="laravel", class_name="Laravel",
-                 plug_type="APP", description="Laravel app")
-    plug_factory(plugs, type_sub="Asset", name="mysql", class_name="MySQL",
-                 plug_type="ASSET", description="MySQL")
+    plug_factory(
+        plugs,
+        type_sub="App",
+        name="laravel",
+        class_name="Laravel",
+        plug_type="APP",
+        description="Laravel app",
+    )
+    plug_factory(
+        plugs,
+        type_sub="Asset",
+        name="mysql",
+        class_name="MySQL",
+        plug_type="ASSET",
+        description="MySQL",
+    )
     return plugs
 
 

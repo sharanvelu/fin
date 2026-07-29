@@ -39,10 +39,14 @@ def _container_or_warn(name: str, engine: str):
     try:
         container = find_container(name)
     except Exception:
-        warning(f"{engine} asset container '{name}' is not running; skipping DB creation.")
+        warning(
+            f"{engine} asset container '{name}' is not running; skipping DB creation."
+        )
         return None
     if container.status != "running":
-        warning(f"{engine} asset container '{name}' is not running; skipping DB creation.")
+        warning(
+            f"{engine} asset container '{name}' is not running; skipping DB creation."
+        )
         return None
     return container
 
@@ -91,20 +95,31 @@ def _ensure_postgres_database(database: str) -> None:
         )
         return
     # Postgres has no CREATE DATABASE IF NOT EXISTS; guard with a check.
-    check = (
-        f"SELECT 1 FROM pg_database WHERE datname = '{database}'"
-    )
+    check = f"SELECT 1 FROM pg_database WHERE datname = '{database}'"
     exists = container.exec_run(
-        ["psql", "-U", Config.ASSET_USERNAME, "-tAc", check,
-         Config.ASSET_DEFAULT_DATABASE],
+        [
+            "psql",
+            "-U",
+            Config.ASSET_USERNAME,
+            "-tAc",
+            check,
+            Config.ASSET_DEFAULT_DATABASE,
+        ],
         demux=False,
     )
     if exists.exit_code == 0 and b"1" in (exists.output or b""):
         info(f"Database [bold]{database}[/bold] already exists (Postgres).")
         return
     create = container.exec_run(
-        ["psql", "-U", Config.ASSET_USERNAME, "-d", Config.ASSET_DEFAULT_DATABASE,
-         "-c", f'CREATE DATABASE "{database}"'],
+        [
+            "psql",
+            "-U",
+            Config.ASSET_USERNAME,
+            "-d",
+            Config.ASSET_DEFAULT_DATABASE,
+            "-c",
+            f'CREATE DATABASE "{database}"',
+        ],
         demux=False,
     )
     if create.exit_code == 0:

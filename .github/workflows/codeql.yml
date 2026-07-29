@@ -1,0 +1,49 @@
+# CodeQL security scanning for Python source and GitHub Actions workflows.
+#
+# NOT a required check — findings land in the Security tab (SARIF upload),
+# they alert rather than block. Runs on merges to master, a weekly cron, and
+# on demand. The cron is guarded by repository owner so forks don't burn
+# minutes on scheduled scans.
+
+name: codeql
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "26 7 * * 1" # weekly, Monday 07:26 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    if: github.event_name != 'schedule' || github.repository_owner == 'sharanvelu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload SARIF results
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -8,7 +8,7 @@ container actions. Each reserved command is registered in
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 
@@ -82,6 +82,7 @@ def load_reserved() -> None:
     """Import all reserved-command modules so they register themselves."""
     # Imported for side effects (registration via @reserved).
     from fincli.commands import (  # noqa: F401
+        agents_cmd,
         asset,
         config_cmd,
         containers,

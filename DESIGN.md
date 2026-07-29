@@ -330,9 +330,11 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   interpreter and the whole `fincli` package, so the host needs **no Python** —
   only Docker at runtime. Onedir is preferred over onefile for fast startup (no
   per-run extraction). PyInstaller **cannot cross-compile**, so
-  `.github/workflows/release.yml` builds on a matrix of native runners
-  (`macos-14`/arm64, `macos-13`/x64, `ubuntu-latest`/x64, `ubuntu-24.04-arm`/arm64)
-  on `v*` tag pushes and attaches the tarballs to the GitHub Release.
+  `.github/workflows/build.yml` builds on a matrix of native runners
+  (`macos-14`/arm64, `ubuntu-latest`/x64, `ubuntu-24.04-arm`/arm64)
+  on `v*` tag pushes (dispatched by `tag.yml` when the version in
+  `pyproject.toml` changes on master) and attaches the tarballs to the
+  GitHub Release.
   `install.sh` detects OS/arch, downloads the matching tarball from
   `sharanvelu/fin` Releases, unpacks it to `~/.fin-cli`, symlinks the launcher
   onto `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper

@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import tarfile
 
-import pytest
 
 from fincli.config import Config
 from fincli.core import certs
@@ -35,12 +34,14 @@ def test_discover_certs_empty_when_no_dir():
 
 
 def test_discover_certs_finds_pem_and_crt_ignores_others():
-    _write_certs(**{
-        "corp.pem": "PEM",
-        "root.crt": "CRT",
-        "notes.txt": "nope",
-        "README.md": "nope",
-    })
+    _write_certs(
+        **{
+            "corp.pem": "PEM",
+            "root.crt": "CRT",
+            "notes.txt": "nope",
+            "README.md": "nope",
+        }
+    )
     names = [p.name for p in certs.discover_certs()]
     assert names == ["corp.pem", "root.crt"]  # sorted, only pem/crt
 
@@ -55,6 +56,7 @@ def test_discover_certs_case_insensitive_suffix():
 # --------------------------------------------------------------------------- #
 def test_dest_name_forces_crt_and_prefix(tmp_path):
     from pathlib import Path
+
     assert certs._dest_name(Path("/x/corp.pem")) == "fin-corp.crt"
     assert certs._dest_name(Path("/x/root.crt")) == "fin-root.crt"
 
@@ -88,8 +90,11 @@ def test_install_certs_copies_and_refreshes():
     # tar pushed into the Debian default trust dir
     assert c.put_archive.call_args.args[0] == "/usr/local/share/ca-certificates"
     # the refresh command ran
-    update_calls = [call for call in c.exec_run.call_args_list
-                    if call.args and call.args[0] == ["update-ca-certificates"]]
+    update_calls = [
+        call
+        for call in c.exec_run.call_args_list
+        if call.args and call.args[0] == ["update-ca-certificates"]
+    ]
     assert len(update_calls) == 1
     assert update_calls[0].kwargs.get("user") == "root"
 

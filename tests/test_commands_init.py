@@ -32,8 +32,19 @@ def test_reserved_decorator_registers():
 
 def test_load_reserved_registers_all_system_commands():
     load_reserved()
-    for name in ("up", "down", "stop", "ps", "exec", "inspect", "logs",
-                 "images", "config", "asset", "plugs"):
+    for name in (
+        "up",
+        "down",
+        "stop",
+        "ps",
+        "exec",
+        "inspect",
+        "logs",
+        "images",
+        "config",
+        "asset",
+        "plugs",
+    ):
         assert name in RESERVED_COMMANDS, f"missing reserved command: {name}"
 
 

@@ -25,11 +25,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # Candidate unix sockets, in priority order. The first that exists wins unless
 # DOCKER_HOST is explicitly set in the environment.
 _SOCKET_CANDIDATES = (
-    "{home}/.docker/run/docker.sock",          # Docker Desktop (macOS)
-    "{home}/.colima/default/docker.sock",      # Colima default
-    "{home}/.colima/docker.sock",              # Colima (older)
-    "{home}/.rd/docker.sock",                  # Rancher Desktop
-    "/var/run/docker.sock",                    # Linux / WSL standard
+    "{home}/.docker/run/docker.sock",  # Docker Desktop (macOS)
+    "{home}/.colima/default/docker.sock",  # Colima default
+    "{home}/.colima/docker.sock",  # Colima (older)
+    "{home}/.rd/docker.sock",  # Rancher Desktop
+    "/var/run/docker.sock",  # Linux / WSL standard
     "{home}/.local/share/containers/podman/machine/podman.sock",  # Podman
 )
 
@@ -38,11 +38,12 @@ class DockerService:
     """Lazily-initialised singleton wrapping ``docker.from_env``."""
 
     _instance: "DockerService | None" = None
+    _client: "DockerClient | None"
 
     def __new__(cls) -> "DockerService":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._client = None  # type: ignore[attr-defined]
+            cls._instance._client = None
         return cls._instance
 
     # --- socket detection ---------------------------------------------------
@@ -66,9 +67,9 @@ class DockerService:
     @property
     def client(self) -> "DockerClient":
         """Return the shared ``DockerClient``, creating it on first access."""
-        if self._client is None:  # type: ignore[attr-defined]
-            self._client = self._create_client()  # type: ignore[attr-defined]
-        return self._client  # type: ignore[attr-defined]
+        if self._client is None:
+            self._client = self._create_client()
+        return self._client
 
     def _create_client(self) -> "DockerClient":
         try:
@@ -97,11 +98,11 @@ class DockerService:
 
     def close(self) -> None:
         """Close the underlying client if it was created."""
-        if self._client is not None:  # type: ignore[attr-defined]
+        if self._client is not None:
             try:
-                self._client.close()  # type: ignore[attr-defined]
+                self._client.close()
             finally:
-                self._client = None  # type: ignore[attr-defined]
+                self._client = None
 
     # --- context manager ----------------------------------------------------
     def __enter__(self) -> "DockerService":

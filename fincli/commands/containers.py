@@ -34,10 +34,13 @@ def _read_stats(containers) -> dict[str, dict[str, str]]:
 
 def _cpu_percent(s: dict) -> str:
     try:
-        cpu = s["cpu_stats"]; pre = s["precpu_stats"]
+        cpu = s["cpu_stats"]
+        pre = s["precpu_stats"]
         cpu_delta = cpu["cpu_usage"]["total_usage"] - pre["cpu_usage"]["total_usage"]
         sys_delta = cpu["system_cpu_usage"] - pre.get("system_cpu_usage", 0)
-        ncpus = cpu.get("online_cpus") or len(cpu["cpu_usage"].get("percpu_usage") or [1])
+        ncpus = cpu.get("online_cpus") or len(
+            cpu["cpu_usage"].get("percpu_usage") or [1]
+        )
         if sys_delta > 0 and cpu_delta > 0:
             return f"{(cpu_delta / sys_delta) * ncpus * 100:.1f}"
     except (KeyError, TypeError, ZeroDivisionError):
@@ -106,7 +109,10 @@ def exec_cmd(args: list[str]) -> int:
     env = ProjectEnv.load()
     container = find_primary(env.project_name)
     if container.status != "running":
-        error(f"'{container.name}' is not running. Run 'fin up' first.", title="Not Running")
+        error(
+            f"'{container.name}' is not running. Run 'fin up' first.",
+            title="Not Running",
+        )
         return EXIT_USER
     # Run through the interactive helper: when fin is attached to a real TTY it
     # gives commands like `fin exec sh` / `fin exec bash` a proper session
@@ -156,16 +162,24 @@ def logs(args: list[str]) -> int:
     while i < len(args):
         a = args[i]
         if a == "--tail" and i + 1 < len(args):
-            tail = args[i + 1]; i += 2; continue
+            tail = args[i + 1]
+            i += 2
+            continue
         if a == "--since" and i + 1 < len(args):
-            since = args[i + 1]; i += 2; continue
+            since = args[i + 1]
+            i += 2
+            continue
         if not a.startswith("-") and name is None:
             name = a
         i += 1
 
     container = find_container(name) if name else find_primary(env.project_name)
 
-    kwargs = {"stream": follow, "follow": follow, "tail": int(tail) if str(tail).isdigit() else "all"}
+    kwargs = {
+        "stream": follow,
+        "follow": follow,
+        "tail": int(tail) if str(tail).isdigit() else "all",
+    }
     if since:
         kwargs["since"] = since
 

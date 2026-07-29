@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import config_cmd as cfg
@@ -46,7 +45,9 @@ def test_config_enable_unknown_asset(monkeypatch):
 def test_config_enable(monkeypatch):
     captured = {}
     monkeypatch.setattr(cfg, "load_by_name", lambda n: FakeLP(FakeAssetPlug()))
-    monkeypatch.setattr(cfg, "set_asset_enabled", lambda name, val: captured.update(name=name, val=val))
+    monkeypatch.setattr(
+        cfg, "set_asset_enabled", lambda name, val: captured.update(name=name, val=val)
+    )
     assert cfg.config(["enable", "mysql"]) == EXIT_OK
     assert captured == {"name": "mysql", "val": True}
 
@@ -54,13 +55,17 @@ def test_config_enable(monkeypatch):
 def test_config_disable(monkeypatch):
     captured = {}
     monkeypatch.setattr(cfg, "load_by_name", lambda n: FakeLP(FakeAssetPlug()))
-    monkeypatch.setattr(cfg, "set_asset_enabled", lambda name, val: captured.update(name=name, val=val))
+    monkeypatch.setattr(
+        cfg, "set_asset_enabled", lambda name, val: captured.update(name=name, val=val)
+    )
     assert cfg.config(["disable", "mysql"]) == EXIT_OK
     assert captured["val"] is False
 
 
 def test_config_rejects_non_asset_plug(monkeypatch):
-    monkeypatch.setattr(cfg, "load_by_name", lambda n: FakeLP(FakeAssetPlug(), plug_type=PlugType.APP))
+    monkeypatch.setattr(
+        cfg, "load_by_name", lambda n: FakeLP(FakeAssetPlug(), plug_type=PlugType.APP)
+    )
     assert cfg.config(["enable", "laravel"]) == EXIT_USER
 
 

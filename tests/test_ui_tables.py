@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 
 from rich.console import Group
 
-from fincli.ui import tables
 from fincli.ui.tables import (
     make_container_table,
     make_grouped_container_tables,
@@ -58,7 +57,10 @@ def test_ports_to_str_renders():
     c = make_fake_container()
     c.attrs = {
         "NetworkSettings": {
-            "Ports": {"80/tcp": [{"HostPort": "8080"}], "443/tcp": [{"HostPort": "8443"}]}
+            "Ports": {
+                "80/tcp": [{"HostPort": "8080"}],
+                "443/tcp": [{"HostPort": "8443"}],
+            }
         }
     }
     out = _ports_to_str(c)
@@ -87,9 +89,13 @@ def test_human_size(n, expected):
 
 
 def test_make_container_table_returns_table():
-    c = make_fake_container(name="demo-web", status="running",
-                            labels={"FIN_SERVICE": "web"})
-    c.attrs = {"Config": {"Labels": {"FIN_SERVICE": "web"}}, "NetworkSettings": {"Ports": {}}}
+    c = make_fake_container(
+        name="demo-web", status="running", labels={"FIN_SERVICE": "web"}
+    )
+    c.attrs = {
+        "Config": {"Labels": {"FIN_SERVICE": "web"}},
+        "NetworkSettings": {"Ports": {}},
+    }
     table = make_container_table([c], title="Test")
     assert isinstance(table, Table)
     assert table.row_count == 1
@@ -172,12 +178,18 @@ def test_grouped_tables_skip_empty_sections():
 def test_grouped_tables_share_column_widths():
     # Sections have very different content widths; every section's columns must
     # still be pinned to one shared width so the tables line up.
-    app = _typed("app", name="a-really-long-application-name-web", id="app000000001",
-                 labels={"FIN_SERVICE": "web", "FIN_SITE": "http://strt.localhost"})
-    asset = _typed("asset", name="fin_mysql", id="asset0000001",
-                   labels={"FIN_SERVICE": "mysql"})
-    other = _typed("proxy", name="fin_proxy", id="proxy0000001",
-                   labels={"FIN_SERVICE": "proxy"})
+    app = _typed(
+        "app",
+        name="a-really-long-application-name-web",
+        id="app000000001",
+        labels={"FIN_SERVICE": "web", "FIN_SITE": "http://strt.localhost"},
+    )
+    asset = _typed(
+        "asset", name="fin_mysql", id="asset0000001", labels={"FIN_SERVICE": "mysql"}
+    )
+    other = _typed(
+        "proxy", name="fin_proxy", id="proxy0000001", labels={"FIN_SERVICE": "proxy"}
+    )
     sections = make_grouped_container_tables([app, asset, other])
     assert len(sections) == 3
     width_sets = [tuple(col.width for col in table.columns) for _, table in sections]
@@ -215,8 +227,17 @@ def test_grouped_table_with_stats_includes_stats_columns():
         [app], stats={app.id: {"cpu": "1.0", "mem": "5MB"}}
     )[0]
     headers = [col.header for col in table.columns]
-    assert headers == ["ID", "Name", "Service", "Site", "State", "Status",
-                       "Ports", "CPU%", "Mem"]
+    assert headers == [
+        "ID",
+        "Name",
+        "Service",
+        "Site",
+        "State",
+        "Status",
+        "Ports",
+        "CPU%",
+        "Mem",
+    ]
 
 
 def test_grouped_table_empty_stats_dict_still_shows_columns():
@@ -229,15 +250,19 @@ def test_grouped_table_empty_stats_dict_still_shows_columns():
 
 def test_grouped_table_uses_service_and_site_labels():
     app = _typed(
-        "app", name="myapp-web", id="app000000001",
+        "app",
+        name="myapp-web",
+        id="app000000001",
         labels={"FIN_SERVICE": "web", "FIN_SITE": "http://strt.localhost"},
     )
     app.attrs = {
-        "Config": {"Labels": {
-            "FIN_TYPE": "app",
-            "FIN_SERVICE": "web",
-            "FIN_SITE": "http://strt.localhost",
-        }},
+        "Config": {
+            "Labels": {
+                "FIN_TYPE": "app",
+                "FIN_SERVICE": "web",
+                "FIN_SITE": "http://strt.localhost",
+            }
+        },
         "NetworkSettings": {"Ports": {}},
         "State": {"Status": "running"},
     }

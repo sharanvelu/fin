@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import asset as ac
@@ -12,8 +11,11 @@ from conftest import make_fake_container
 
 
 def _patch_env(monkeypatch, tmp_path):
-    monkeypatch.setattr(ac.ProjectEnv, "load",
-                        classmethod(lambda cls: ProjectEnv(cwd=tmp_path, values={})))
+    monkeypatch.setattr(
+        ac.ProjectEnv,
+        "load",
+        classmethod(lambda cls: ProjectEnv(cwd=tmp_path, values={})),
+    )
 
 
 def test_asset_up_default(monkeypatch, tmp_path):

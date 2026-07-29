@@ -18,12 +18,30 @@ def registry(tmp_path, monkeypatch, plug_factory):
     monkeypatch.setattr(Config, "PLUGS_DIR", plugs)
     monkeypatch.setattr(Config, "REGISTRY_DB", tmp_path / "registry.db")
 
-    plug_factory(plugs, type_sub="App", name="laravel", class_name="Laravel",
-                 plug_type="APP", description="Laravel app")
-    plug_factory(plugs, type_sub="Asset", name="mysql", class_name="MySQL",
-                 plug_type="ASSET", description="MySQL db")
-    plug_factory(plugs, type_sub="Asset", name="redis", class_name="Redis",
-                 plug_type="ASSET", description="Redis")
+    plug_factory(
+        plugs,
+        type_sub="App",
+        name="laravel",
+        class_name="Laravel",
+        plug_type="APP",
+        description="Laravel app",
+    )
+    plug_factory(
+        plugs,
+        type_sub="Asset",
+        name="mysql",
+        class_name="MySQL",
+        plug_type="ASSET",
+        description="MySQL db",
+    )
+    plug_factory(
+        plugs,
+        type_sub="Asset",
+        name="redis",
+        class_name="Redis",
+        plug_type="ASSET",
+        description="Redis",
+    )
 
     reg = Registry()
     yield reg
@@ -83,8 +101,13 @@ def test_sync_refreshes_on_change(registry, tmp_path, plug_factory):
     registry.sync()
     assert len(registry.all(refresh=False)) == 3
     # Add a global plug and re-sync.
-    plug_factory(Config.PLUGS_DIR, type_sub="Global", name="extra",
-                 class_name="Extra", plug_type="GLOBAL")
+    plug_factory(
+        Config.PLUGS_DIR,
+        type_sub="Global",
+        name="extra",
+        class_name="Extra",
+        plug_type="GLOBAL",
+    )
     assert registry.sync() == 4
     assert len(registry.all(refresh=False)) == 4
 

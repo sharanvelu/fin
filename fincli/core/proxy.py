@@ -10,7 +10,12 @@ from __future__ import annotations
 from typing import Any
 
 from fincli.config import Config
-from fincli.core.containers import base_labels, ensure_network, run_container, traefik_labels
+from fincli.core.containers import (
+    base_labels,
+    ensure_network,
+    run_container,
+    traefik_labels,
+)
 from fincli.ui.console import success
 from fincli.ui.spinners import fin_spinner
 
@@ -32,7 +37,9 @@ def is_proxy_running() -> bool:
     from fincli.core.docker_client import get_docker
 
     client = get_docker().client
-    matches = client.containers.list(all=True, filters={"name": f"^{Config.PROXY_CONTAINER}$"})
+    matches = client.containers.list(
+        all=True, filters={"name": f"^{Config.PROXY_CONTAINER}$"}
+    )
     return bool(matches) and matches[0].status == "running"
 
 

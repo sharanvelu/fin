@@ -89,7 +89,9 @@ def test_setup_hook_is_noop_by_default():
 
 
 def test_plugcommand_fields():
-    handler = lambda ctx, args: 0
+    def handler(ctx, args):
+        return 0
+
     cmd = PlugCommand("artisan", handler, "Run artisan", aliases=("art",))
     assert cmd.name == "artisan"
     assert cmd.handler is handler

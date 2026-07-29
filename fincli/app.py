@@ -7,7 +7,6 @@ date, the default network) plus small helpers used across the codebase such as
 
 from __future__ import annotations
 
-import sys
 from typing import NoReturn
 
 from fincli import __version__
@@ -15,9 +14,9 @@ from fincli.config import Config
 
 
 # Exit codes (documented contract — see README "Error Handling Standards").
-EXIT_OK = 0       # success
-EXIT_USER = 1     # user error (bad input, missing env, not found by user fault)
-EXIT_SYSTEM = 2   # system/docker error (daemon down, API failure)
+EXIT_OK = 0  # success
+EXIT_USER = 1  # user error (bad input, missing env, not found by user fault)
+EXIT_SYSTEM = 2  # system/docker error (daemon down, API failure)
 
 
 class App:
