@@ -5,12 +5,16 @@
 # guarantee anything reaching master already passed, so each release builds
 # exactly once from vetted code.
 #
-# Triggers and what they publish:
-#   push to master        → refresh the rolling `latest` prerelease (install.sh
-#                           default; the tag is force-moved, assets replaced)
-#   workflow_dispatch at a v* tag (how tag.yml cuts releases — see tag.yml for
-#   why it must dispatch)  → immutable versioned release
-#   push of a v* tag      → same, for manually pushed tags
+# Runs ONLY at v* tags — one build per release, nothing on ordinary master
+# pushes. Each release publishes twice from the same artifacts:
+#   1. the immutable vX.Y.Z release
+#   2. a refresh of the rolling `latest` prerelease, which is what install.sh
+#      downloads by default (its tag is force-moved to the release commit)
+#
+# Triggers:
+#   workflow_dispatch at a v* tag  → how tag.yml cuts releases (see tag.yml for
+#                                    why it must dispatch instead of push)
+#   push of a v* tag               → same, for manually pushed tags
 #   workflow_dispatch with dry_run → build all platforms, publish nothing
 #
 # The tool's own version (`fin --version`) comes from pyproject.toml; bumping
@@ -20,7 +24,6 @@ name: build & release
 
 on:
   push:
-    branches: [master]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -73,47 +76,17 @@ jobs:
           path: dist/fin-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
-  # Rolling prerelease: one job (not per-matrix) so the `latest` tag can be
-  # force-moved atomically after all binaries are built.
-  release-latest:
-    name: rolling release (latest)
-    needs: build
-    if: github.ref == 'refs/heads/master' && inputs.dry_run != true
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write # move the `latest` tag, replace release assets
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: fin-*
-          merge-multiple: true
-          path: dist
-
-      - name: Refresh the rolling `latest` release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          # Delete the old release + tag (ignore if absent), then recreate the
-          # tag at THIS commit with the fresh assets — a true rolling pointer.
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest dist/*.tar.gz \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Latest build" \
-            --notes "Rolling build from master (\`${GITHUB_SHA}\`). For a pinned, stable build install a v* release instead."
-
-  # Immutable versioned release: reached via tag.yml's dispatch at the v* tag
-  # (the normal path) or a manually pushed v* tag.
-  release-tag:
-    name: versioned release
+  # One job (not per-matrix) so both releases are published atomically after
+  # ALL binaries built. Guarded on the tag ref so a dry-run dispatch from a
+  # branch can never publish.
+  release:
+    name: publish release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v') && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write # create the release, upload assets
+      contents: write # create releases, move the `latest` tag, upload assets
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -131,3 +104,18 @@ jobs:
             --notes "Fin $GITHUB_REF_NAME" \
             --verify-tag \
           || gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz --clobber
+
+      - name: Refresh the rolling `latest` release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # install.sh downloads the `latest` prerelease by default. Delete the
+          # old release + tag (ignore if absent), then recreate the tag at the
+          # commit this release was built from, with the same assets.
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest dist/*.tar.gz \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Latest build ($GITHUB_REF_NAME)" \
+            --notes "Rolling pointer to the newest release ($GITHUB_REF_NAME, \`${GITHUB_SHA}\`). Install a v* release for a pinned build."

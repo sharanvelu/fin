@@ -65,7 +65,7 @@ esac
 ARTIFACT="fin-${OS}-${ARCH}.tar.gz"
 
 # --- resolve the download URL -----------------------------------------------
-# "latest" = the rolling prerelease refreshed on every master merge; its tag is
+# "latest" = the rolling prerelease refreshed on every versioned release; its tag is
 # literally `latest`. GitHub's /releases/latest/ redirect skips prereleases, so
 # address the tag directly. A specific version installs the immutable v* release.
 if [ "$FIN_VERSION" = "latest" ]; then

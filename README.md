@@ -89,7 +89,7 @@ Installer environment overrides:
 
 | Variable           | Purpose                                     | Default                            |
 | ------------------ | ------------------------------------------- | ---------------------------------- |
-| `FIN_VERSION`      | release to install — `latest` = the rolling prerelease built from every master merge; a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
+| `FIN_VERSION`      | release to install — `latest` = the rolling prerelease pointing at the newest versioned release; a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
 | `FIN_HOME_DIR`     | binary install location                     | `$HOME/.fin-cli`                   |
 | `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
 | `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
