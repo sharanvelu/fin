@@ -1,9 +1,10 @@
 """Fin-specific exceptions and a decorator that renders them cleanly.
 
-End users must never see a raw Python traceback. Command functions raise
-:class:`FinError` (or its subclasses) for expected failures; the
-:func:`handle_errors` decorator catches those plus the common Docker SDK
-exceptions and renders a friendly Rich panel, then exits with the right code.
+Expected failures never surface as a raw Python traceback. Command functions
+raise :class:`FinError` (or its subclasses); the :func:`handle_errors`
+decorator catches those plus the common Docker SDK exceptions and renders a
+friendly Rich panel, then exits with the right code. A genuinely unexpected
+exception (a bug) still propagates as a traceback rather than being masked.
 """
 
 from __future__ import annotations
@@ -46,8 +47,9 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     """Wrap a command callable so all known errors render as Rich panels.
 
     Catches, in order: :class:`FinError`, Docker SDK ``NotFound`` /
-    ``APIError`` / ``DockerException``, and finally any unexpected exception
-    (shown as a generic system error, never a traceback).
+    ``APIError`` / ``DockerException``, and ``KeyboardInterrupt`` — and only
+    those. A genuinely unexpected exception (a bug) still propagates as a
+    traceback rather than being masked.
     """
 
     @functools.wraps(func)

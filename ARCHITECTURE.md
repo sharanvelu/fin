@@ -16,8 +16,9 @@ Dependencies point **downward**. Two invariants hold the whole system together:
 
 1. **The UI layer (`fincli/ui`) is the only place that prints.** Nothing else
    writes to the terminal.
-2. **The core orchestrator is the only place that mutates the Docker daemon.**
-   Plugs never touch Docker — they only describe what they need.
+2. **All Docker work goes through `get_docker().client` and the core helpers.**
+   Plugs never touch Docker — they only describe what they need; the
+   orchestrator acts on their behalf.
 
 ```
         ┌────────────────────────────────────────────────────────────┐
@@ -62,7 +63,7 @@ Dependencies point **downward**. Two invariants hold the whole system together:
 | Reserved commands | `commands/` | System commands Fin owns and never delegates: `up`, `down`, `stop`, `ps`/`status`, `exec`, `inspect`, `logs`, `images`, `config`, `asset`, `plugs`, `agents`. |
 | Plugin system | `plugs/base.py`, `loader.py`, `registry.py`, `context.py`, `catalog.py` | `FinPlug` base class (only its subclasses count); importlib loader with graceful failure; SQLite-cached registry over the flat `PLUGS_DIR/<name>.py` plug files, plus install/uninstall/search against the remote fin-plugs catalog (`catalog.py`); `PlugContext` that lets a plug command exec inside the primary container. |
 | AI agents | `agents/` | Renders and installs per-agent instruction files (`fin agents install`) that teach AI coding agents (Claude Code, Cursor, Codex, …) to run project commands through `fin`, with command tables built from the installed plugs' metadata. |
-| Core | `core/orchestrator.py`, `proxy.py`, `database.py`, `certs.py`, `containers.py`, `interactive.py`, `env.py`, `store.py`, `wait.py`, `docker_client.py`, `errors.py` | The only code that touches Docker. Turns plug `ContainerSpec`s into running containers; ensures the Traefik proxy; creates the project DB; installs user CA certs (`~/.fin/certs`) into opted-in containers; builds labels + Traefik routing; runs interactive exec sessions; parses `.env` and validates `FIN_*`; persists asset toggles; waits for asset readiness; wraps the Docker SDK as a singleton; renders friendly errors. |
+| Core | `core/orchestrator.py`, `proxy.py`, `database.py`, `certs.py`, `containers.py`, `interactive.py`, `env.py`, `store.py`, `wait.py`, `docker_client.py`, `errors.py` | Fin's Docker machinery — all Docker work goes through `get_docker().client` and these helpers (plugs never touch Docker). Turns plug `ContainerSpec`s into running containers; ensures the Traefik proxy; creates the project DB; installs user CA certs (`~/.fin/certs`) into opted-in containers; builds labels + Traefik routing; runs interactive exec sessions; parses `.env` and validates `FIN_*`; persists asset toggles; waits for asset readiness; wraps the Docker SDK as a singleton; renders friendly errors. |
 | UI | `ui/console.py`, `tables.py`, `spinners.py` | The single Rich `Console`; status-coloured container/image table factories; the `fin_spinner` context manager. The only printer. |
 | Identity / config | `app.py`, `config.py` | `App` singleton (name, version, network, `terminate()`); exit codes `0`/`1`/`2`; system configuration — paths, label keys, network name, shared-asset credentials, proxy image. |
 
@@ -106,7 +107,8 @@ interactive=True)`, attaching a TTY so `exit` ends them cleanly.
   binary that embeds its own interpreter; only Docker is needed at runtime. From
   source (developers), the `fin` launcher runs system Python 3.11+ via
   `python3 -m fincli` — no virtualenv. See DESIGN.md §10 for packaging.
-- **No raw tracebacks.** Docker/usage errors render as Rich panels; exit codes
+- **Friendly errors.** Fin errors and Docker errors render as Rich panels
+  rather than tracebacks (a genuine bug still shows a traceback); exit codes
   are `0` success, `1` user error, `2` system/Docker error.
 
 ## Where to go next

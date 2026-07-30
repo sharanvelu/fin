@@ -9,7 +9,9 @@ Teardown scopes:
     fin down asset      → all shared asset containers
     fin down all        → every Fin-managed container
     fin stop [asset|all]→ same scopes, stop without removing
-    -f / --force        → force removal
+    -f / --force        → with `down`, also force-remove non-running containers
+                          (running ones are force-removed even without it);
+                          `stop` ignores the flag
 """
 
 from __future__ import annotations
@@ -161,6 +163,8 @@ def _scope_containers(scope: str, env: ProjectEnv):
 
 def _teardown(args: list[str], *, remove: bool) -> int:
     force = "-f" in args or "--force" in args
+    if force and not remove:
+        warning("`stop` ignores -f/--force (only `down` force-removes).")
     positional = [a for a in args if not a.startswith("-")]
     scope = positional[0] if positional else "project"
 
@@ -191,14 +195,21 @@ def _teardown(args: list[str], *, remove: bool) -> int:
 
 @reserved(
     "down",
-    help="Stop and remove containers. Scopes: [asset|all]; -f to force.",
+    help="Stop and remove containers. Scopes: [asset|all]. Running containers "
+    "are force-removed even without -f.",
     usage="fin down [asset|all] [-f]",
     subcommands=(
         ("(none)", "Remove this project's containers (app + worker)."),
         ("asset", "Remove all shared asset containers."),
         ("all", "Remove every Fin-managed container (incl. proxy & assets)."),
     ),
-    options=(("-f, --force", "Force-remove containers."),),
+    options=(
+        (
+            "-f, --force",
+            "Also force-remove non-running containers "
+            "(running ones are always force-removed).",
+        ),
+    ),
     examples=("fin down", "fin down asset", "fin down all -f"),
 )
 def down(args: list[str]) -> int:

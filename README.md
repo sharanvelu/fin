@@ -43,8 +43,9 @@ a declarative plugin system, and a single audited path to the Docker daemon.
   by hostname (`Host(...)` / wildcard `HostRegexp`) — no port juggling.
 - **Shared assets.** One MySQL/Postgres/Redis/MinIO container is shared across
   every project, so multiple apps reuse the same database server.
-- **Friendly errors.** No raw tracebacks — Docker problems render as clean Rich
-  panels with meaningful exit codes.
+- **Friendly errors.** Fin and Docker problems render as clean Rich panels with
+  meaningful exit codes — no raw tracebacks for expected failures (a genuine
+  bug still shows one).
 - **No Python on the host.** The published Fin is a **prebuilt, standalone
   binary** that embeds its own Python interpreter and `fincli` — you just need
   Docker at runtime. (Developing from source still runs against system Python
@@ -81,11 +82,13 @@ The installer:
    `FIN_HOME_DIR`), giving the `~/.local/lib/fin-cli/fin` executable plus its
    `_internal/` runtime. The whole install is user-local — the installer
    never uses `sudo`.
-3. Symlinks the `fin` launcher into the first writable directory on your `PATH`
-   (tries `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`; override with
-   `FIN_BIN_DIR`).
-4. On macOS, strips the `com.apple.quarantine` attribute so the unsigned binary
+3. On macOS, strips the `com.apple.quarantine` attribute so the unsigned binary
    runs without a Gatekeeper prompt.
+4. Symlinks the `fin` launcher into a writable directory on your `PATH` (tries
+   `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`, preferring one already
+   on your `PATH`; if none qualifies it falls back to a user-owned directory —
+   created if needed — and warns when that directory isn't on your `PATH`.
+   Override with `FIN_BIN_DIR`).
 5. Runs `fin --version` once — the first launch of the unsigned binary is slow
    (~15s while the OS verifies it), so the installer pays that cost up front
    and your first real `fin` command starts instantly.
@@ -97,7 +100,7 @@ Installer environment overrides:
 
 | Variable           | Purpose                                     | Default                            |
 | ------------------ | ------------------------------------------- | ---------------------------------- |
-| `FIN_VERSION`      | release to install — `latest` = the newest published release (GitHub's `releases/latest` redirect); a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
+| `FIN_VERSION`      | release to install — `latest` = the newest published release (GitHub's `releases/latest` redirect); a version like `0.1.0` pins the immutable `v0.1.0` release (a leading `v`, e.g. `v0.1.0`, is accepted too) | `latest`                         |
 | `FIN_HOME_DIR`     | binary install location                     | `$HOME/.local/lib/fin-cli`         |
 | `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
 | `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
@@ -218,8 +221,9 @@ fin down all        # everything Fin manages
 > shared across every project on the machine.
 
 > **Custom CA certificates.** Drop `.pem`/`.crt` files into `~/.fin/certs` and Fin
-> installs them into opted-in app containers on every `fin up` — each cert is copied
-> into the container's trust store and registered with `update-ca-certificates`. Opt
+> installs them into opted-in app containers on every `fin up` — each cert lands in
+> the container's trust store renamed to `fin-<name>.crt` (Debian's
+> `update-ca-certificates` only ingests `.crt` files) and the store is refreshed. Opt
 > in per plug with `ContainerSpec(install_certs=True)`; the bundled Laravel plug
 > already does. Non-Debian images override `cert_dir` / `cert_update_cmd`.
 
@@ -234,17 +238,17 @@ delegated to a plug.
 | Command | Description |
 | ------- | ----------- |
 | `fin up` | Ensure the proxy, start enabled assets, start the primary app container, auto-create the DB. Requires `FIN_APP`. Offers to install any missing `FIN_APP`/`FIN_PLUGS` plugs from the catalog first. |
-| `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. `-f`/`--force` forces removal. |
-| `fin stop [asset\|all]` | Stop containers without removing them. Same scopes as `down`. |
+| `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. Running containers are force-removed even without `-f`; `-f`/`--force` also force-removes non-running ones. |
+| `fin stop [asset\|all]` | Stop containers without removing them. Same scopes as `down`. (`-f` is ignored — only `down` force-removes.) |
 | `fin config enable\|disable\|get\|list` | Manage which **asset** plugs auto-start with `up`. |
-| `fin asset up\|stop\|down` | Manage the shared asset containers independently of any project. |
+| `fin asset up\|stop\|down [-f]` | Manage the shared asset containers independently of any project. |
 
 ### Containers
 
 | Command | Description |
 | ------- | ----------- |
 | `fin ps` (aliases `status`, `containers`) | List running Fin containers. `-a`/`--all` includes stopped ones; `-s`/`--stats` adds live CPU/memory columns (slower). |
-| `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. When run from a real terminal, interactive sessions like `fin exec sh` / `fin exec bash` attach stdin so they behave like a normal shell (`exit`/Ctrl-D ends them); piped/non-interactive use streams output. |
+| `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. When run from a real terminal, interactive sessions like `fin exec sh` / `fin exec bash` attach stdin so they behave like a normal shell (`exit`/Ctrl-D ends them); piped/non-interactive use streams output. Note: `-h`/`--help` anywhere in the arguments shows Fin's help instead of being passed through (see [Help](#help)). |
 | `fin inspect [name]` | Rich JSON inspect of a container (default: the project's primary). |
 | `fin logs [name] [--follow/-f] [--tail N] [--since X]` | Tail logs (default: the project's primary). |
 
@@ -321,6 +325,10 @@ Available when `FIN_APP=laravel` (or `laravel` is in `FIN_PLUGS`):
   for reserved commands **and** plug commands (plug help also shows the plug's
   required environment variables).
 
+> `-h`/`--help` is recognised **anywhere** on the command line and always shows
+> Fin's help — it is never passed through to the underlying program. E.g.
+> `fin exec php -h` shows Fin's help for `exec` rather than running `php -h`.
+
 ```bash
 fin config --help     # subcommands: enable | disable | get | list
 fin down --help       # scopes [asset|all] and the -f flag
@@ -333,7 +341,8 @@ fin artisan --help    # plug command help, incl. the laravel plug's env spec
 
 ### Project variables (read from `./.env`, or the process environment)
 
-Process environment variables take precedence over the `.env` file, so
+Process environment variables prefixed `FIN_`, `DB_`, or `REDIS_` take
+precedence over the `.env` file (other process variables are not overlaid), so
 `FIN_SITE=other.localhost fin up` works for a one-off override.
 
 | Variable | Meaning |
@@ -342,12 +351,21 @@ Process environment variables take precedence over the `.env` file, so
 | `FIN_PLUGS` | Comma-separated list of auxiliary plugs to consider/start (e.g. `mysql,redis`). |
 | `FIN_SITE` | The host the app is routed at (e.g. `myapp.localhost`). Drives Traefik routing. |
 | `FIN_CONTAINER_NAME` | Override the project name (defaults to the cwd basename, lowercased). |
-| `FIN_DOCKER_IMAGE` | Override the primary container image. *(Laravel)* defaults to `sharanvelu/laravel-php:<FIN_PHP_VERSION>`. |
 | `FIN_OVERRIDE_ASSETS` | Comma-separated assets to start, overriding the persisted enable flags. |
-| `FIN_PHP_VERSION` | *(Laravel)* PHP/image tag, e.g. `8.3`, `8.2`, `latest`. Default `latest`. |
-| `FIN_COMPOSER_VERSION` | *(Laravel)* Composer major version, `1` or `2`. Default `2`. |
 | `DB_CONNECTION`, `DB_DATABASE`, `DB_HOST`, ... | Standard Laravel DB config. `fin up` auto-creates `DB_DATABASE` in the shared MySQL/Postgres engine (`DB_CONNECTION` values `mysql`/`mariadb` and `postgres`/`postgresql`/`pgsql` are recognised). |
 | `REDIS_*` | Standard Redis config (parsed alongside `DB_*`). |
+
+### Plug variables (declared by plugs, not by Fin)
+
+These also live in `./.env` (or the process environment), but `fincli` itself
+never reads them — each plug declares the ones it uses via its `env_spec()`,
+and a plug command's `--help` shows that plug's authoritative list.
+
+| Variable | Meaning |
+| -------- | ------- |
+| `FIN_DOCKER_IMAGE` | Override the primary container image (honoured by both the `laravel` and `django` plugs). *(Laravel)* defaults to `sharanvelu/laravel-php:<FIN_PHP_VERSION>`. |
+| `FIN_PHP_VERSION` | *(Laravel)* PHP/image tag, e.g. `8.3`, `8.2`, `latest`. Default `latest`. |
+| `FIN_COMPOSER_VERSION` | *(Laravel)* Composer major version, `1` or `2`. Default `2`. |
 
 ### System / installer variables (process environment)
 
@@ -356,6 +374,8 @@ Process environment variables take precedence over the `.env` file, so
 | `FIN_DATA_DIR` | Per-user data dir (config, registry, certs, plugs). | `~/.fin` |
 | `FIN_PROXY_IMAGE` | Traefik image for the proxy. | `traefik:v3.6` |
 | `FIN_PYTHON` | Force a specific Python interpreter for the launcher. | auto-detected |
+| `FIN_PLUGS_REPO_RAW` | Raw-content base URL `fin plugs install <name>` fetches plug files from (`<base>/plugs/<name>.py`) — point at a fork/mirror. | the official fin-plugs repo, master branch |
+| `FIN_PLUGS_CATALOG_URL` | URL of the `catalog.json` index used by `fin plugs search`. | the fin-plugs latest-release asset |
 | `DOCKER_HOST` | If set, Fin defers to the Docker SDK's own socket handling. | unset |
 
 > Fixed (not environment-configurable): the network name (`fin`); the registry,
@@ -405,7 +425,9 @@ Web-exposed services additionally get Traefik routing labels derived from
 `*.` wildcards), `entrypoints=web,websecure`, a `service` named `<key>_service`,
 and a loadbalancer `server.port` taken from the plug's spec. The router key is
 the host with `*.`/`.localhost` stripped and `.`/`-` replaced by `_`
-(`my-app.localhost` → `my_app`).
+(`my-app.localhost` → `my_app`). If stripping leaves nothing (a wildcard-only
+host like `*.localhost`), the key falls back to `app` — so two such
+wildcard-only sites would collide on the same router.
 
 ### Command resolution order
 
@@ -430,9 +452,11 @@ by the class's `plug_type` attribute, not by where the file sits:
 ```
 
 `PLUGS_DIR` is fixed at `~/.fin/plugs` (it moves with `FIN_DATA_DIR`). The loader
-imports each file by path, finds the single class that subclasses
-`FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and calls
-`setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
+imports each file by path, picks the first class that subclasses
+`FinPlug` (**only** `FinPlug` subclasses count; any further subclasses in the
+same file are silently ignored — only git-URL installs enforce a single plug),
+instantiates it, and calls `setup()`. A bad plug logs a warning and is skipped
+— it never crashes Fin.
 
 Catalog plugs come from the official
 [fin-plugs](https://github.com/sharanvelu/fin-plugs) repository — browse it (or
@@ -536,7 +560,10 @@ Key points:
   `web_exposed=True` + `web_port=...` to get Traefik routing from `FIN_SITE`. Set
   `workdir_mount` and `up` will bind-mount the project directory there.
 - **`asset_specs(env)`** (ASSET) returns shared-container specs with a fixed
-  `container_name`.
+  `container_name`. A web-exposed asset (`web_exposed=True` + `web_port`) is
+  routed at the host given by `FIN_ASSET_SITE` in the spec's `environment`
+  (set by the plug in the spec, not read from the project `.env`); default
+  `<service>.localhost`.
 - **`commands()`** maps a name to a `PlugCommand(name, handler, help, aliases)`.
   Handlers receive `(ctx: PlugContext, args: list[str])` and return an exit code.
   Use `ctx.exec([...], workdir=...)` to run inside the primary container; pass

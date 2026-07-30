@@ -14,10 +14,12 @@
 #   2. Unpacks it to ${FIN_HOME_DIR:-$HOME/.local/lib/fin-cli}, creating the
 #      directory if needed. The tarball's top-level fin/ folder is stripped so
 #      the install dir IS the package root: fin-cli/fin + fin-cli/_internal/.
-#   3. Symlinks the `fin` launcher into the first writable PATH directory.
-#   4. Runs `fin --version` once so the slow first launch of the unsigned
+#   3. On macOS, strips the com.apple.quarantine attribute so the unsigned
+#      binary runs without a Gatekeeper prompt.
+#   4. Symlinks the `fin` launcher into the first writable PATH directory.
+#   5. Runs `fin --version` once so the slow first launch of the unsigned
 #      binary happens here, not on the user's first command.
-#   5. Creates the plugs directory at ~/.fin/plugs.
+#   6. Creates the plugs directory at ~/.fin/plugs.
 #
 # Configurable via environment variables:
 #   FIN_VERSION       release to install ("latest" or e.g. 0.1.0)  (default: latest)

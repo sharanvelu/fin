@@ -3,13 +3,14 @@
 Discovery model — one shape, a flat directory of single-file plugs:
 
     PLUGS_DIR/
-      <plug_name>.py      → defines exactly one FinPlug subclass
+      <plug_name>.py      → defines a FinPlug subclass
 
 For development, symlink the fin-plugs repo's ``plugs/`` directory to
 ``PLUGS_DIR`` (``ln -s <fin-plugs repo>/plugs ~/.fin/plugs``); installed
-plugs land in the same directory. The loader imports each file, finds the
-single class extending :class:`FinPlug`, instantiates it, calls ``setup()``,
-and returns it. The plug's type is its declared ``plug_type``. Load failures
+plugs land in the same directory. The loader imports each file, picks the
+first class extending :class:`FinPlug` (further subclasses in the same file
+are ignored; only git-URL installs enforce a single plug), instantiates it,
+calls ``setup()``, and returns it. The plug's type is its declared ``plug_type``. Load failures
 are reported as warnings — one bad plug never crashes Fin.
 """
 

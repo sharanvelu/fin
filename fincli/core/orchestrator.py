@@ -90,9 +90,10 @@ def resolve_enabled_assets(env: ProjectEnv) -> list[Any]:
     """Return loaded ASSET plugs that should start for this project.
 
     Selection order of precedence:
-        1. ``FIN_OVERRIDE_ASSETS`` env (comma-separated) — if set, wins.
-        2. The persisted enable flags from ``fin config enable/disable``.
-    Plugs named in ``FIN_PLUGS`` that are assets are always included.
+        1. ``FIN_OVERRIDE_ASSETS`` env (comma-separated) — if set, it alone
+           decides (assets named in ``FIN_PLUGS`` are *not* added).
+        2. Otherwise, the persisted enable flags from ``fin config
+           enable/disable``, plus any assets named in ``FIN_PLUGS``.
     """
     from fincli.core.store import is_asset_enabled
     from fincli.plugs.base import PlugType

@@ -12,9 +12,10 @@ touch Docker themselves — Fin's orchestrator does that on their behalf.
 
 - **All terminal output goes through `fincli/ui`** (`console.success/error/...`).
   Never call bare `print()` outside `fincli/ui`.
-- **Only `fincli/core` touches Docker**, via the `docker` Python SDK
-  (`get_docker().client`, `core/containers.py`, the orchestrator,
-  `PlugContext.exec`). **No `subprocess` calls to the docker CLI.**
+- **All Docker work goes through `get_docker().client` and the core helpers**
+  (`core/containers.py`, the orchestrator, `PlugContext.exec`), via the
+  `docker` Python SDK; plugs never touch Docker. **No `subprocess` calls to
+  the docker CLI.**
 - **Plugs are declarative.** They return `ContainerSpec`/`PlugCommand`; only
   classes subclassing `FinPlug` count. They never import `docker`.
 - **No virtualenv** — from source, Fin runs against system Python with `--user`
