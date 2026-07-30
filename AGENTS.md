@@ -38,11 +38,11 @@ fincli/
   agents/                 `fin agents` content: per-agent instruction-file renderers + installer
   plugs/
     base.py               FinPlug, ContainerSpec, PlugCommand, PlugType
-    loader.py             importlib discovery over App/Asset/Global dirs
+    loader.py             importlib discovery of flat PLUGS_DIR/<name>.py files
     registry.py           SQLite cache (~/.fin/registry.db) + `fin plugs` ops
     context.py            PlugContext.exec(...) inside primary container
   commands/               reserved system commands (@reserved decorator)
-plugs/                    plug source (gitignored, separate repo): App/{laravel,django}, Asset/{mysql,redis,postgres,minio}
+plugs/                    plug source (gitignored, separate fin-plugs repo): plugs/{laravel,django,mysql,redis,postgres,minio}.py
 tests/                    pytest suite + conftest fixtures
 ```
 
@@ -109,7 +109,7 @@ when it's a core Fin capability. To add a plug:
    `ContainerSpec` (Debian defaults; override `cert_dir` / `cert_update_cmd` for
    other bases). The orchestrator installs them on every `fin up`.
 5. `fin plugs list` re-syncs the SQLite registry from disk. See
-   `plugs/App/laravel/__init__.py` and `plugs/Asset/mysql/__init__.py` for full
+   `plugs/laravel.py` and `plugs/mysql.py` in the fin-plugs repo for full
    examples.
 
 ## The env-spec validation pattern
@@ -170,7 +170,8 @@ Tests are hermetic: they never touch a real daemon, `~/.fin`, or the bundled
 - **`ProjectEnv` reads the real cwd.** `ProjectEnv.load()` parses `.env` from
   `Path.cwd()`; pass an explicit `cwd=` in tests. Process env (`FIN_*`,
   `DB_*`, `REDIS_*`) overrides the file.
-- **Plug discovery is directory-based** under `App/Asset/Global`; only `FinPlug`
+- **Plug discovery scans flat `<name>.py` files** directly under PLUGS_DIR;
+  the plug's declared `plug_type` decides its type. Only `FinPlug`
   subclasses defined in the module count. A broken plug warns and is skipped, it
   doesn't crash the run — so a "missing" plug is often an import error in a
   warning, not a hard failure.

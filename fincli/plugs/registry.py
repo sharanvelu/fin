@@ -1,15 +1,14 @@
-"""Plugin registry — SQLite-cached metadata over the directory-grouped plugs.
+"""Plugin registry — SQLite-cached metadata over the installed plugs.
 
-The directory layout (``Plugs/App|Asset|Global``) is the source of truth; this
-SQLite cache (``~/.fin/registry.db``) lets Fin answer "what plugs exist and of
-what type" without importing every plug on every invocation.
+The plugs on disk (flat ``PLUGS_DIR/<name>.py`` files) are the source of
+truth; this SQLite cache (``~/.fin/registry.db``) lets Fin answer "what plugs
+exist and of what type" without importing every plug on every invocation.
 
 The registry also backs the ``fin plugs`` commands:
     list / info / search / install / uninstall
 
-``search`` and ``install`` talk to a remote catalog whose concrete logic is a
-later milestone; the methods here define the interface and a local-first
-fallback.
+``search`` and ``install`` talk to the remote catalog repo over plain HTTPS
+(see :mod:`fincli.plugs.catalog`).
 """
 
 from __future__ import annotations
@@ -79,7 +78,7 @@ class Registry:
                 "(name, version, plug_type, description, commands, path) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (
-                    info["name"] or lp.path.name,
+                    info["name"] or lp.path.stem,
                     info["version"],
                     info["type"],
                     info["description"],
@@ -129,76 +128,150 @@ class Registry:
             path=row["path"],
         )
 
-    # --- catalog operations (remote logic deferred) -------------------------
+    # --- catalog operations ---------------------------------------------------
     def search(self, query: str) -> list[dict]:
-        """Search the remote plug catalog.
+        """Search the remote plug catalog by name/description.
 
-        Catalog logic is a later milestone. For now this raises a clear,
-        non-crashing message so the command surface exists and is testable.
+        Each returned entry is a catalog dict (name, type, version,
+        description, commands, file) plus an ``installed`` flag comparing
+        against the local registry.
         """
-        raise FinError(
-            f"Plug catalog search for '{query}' is not yet available — "
-            "the remote catalog will be wired up in a later release.",
-            title="Not Implemented",
-        )
+        from fincli.plugs import catalog
+
+        results = catalog.search_catalog(query)
+        installed = {r.name for r in self.all()}
+        for entry in results:
+            entry["installed"] = entry.get("name") in installed
+        return results
 
     def install(self, name: str, *, repo_url: str | None = None) -> Path:
-        """Install a plug into the correct type directory.
+        """Install a single-file plug into ``PLUGS_DIR/<name>.py``.
 
-        If *repo_url* is given (or *name* looks like a git URL), clone it;
-        otherwise defer to the (not-yet-available) catalog. The destination
-        type sub-directory is decided after a successful clone by reading the
-        plug's declared type.
+        A plain name fetches the plug from the official catalog repo; a git
+        URL clones the repo and installs the one plug file it contains.
         """
         url = repo_url or (name if _looks_like_git(name) else None)
         if url is None:
+            return self._install_from_catalog(name)
+        return self._install_from_git(url)
+
+    def _install_from_catalog(self, name: str) -> Path:
+        """Fetch ``plugs/<name>.py`` from the catalog repo into PLUGS_DIR."""
+        from fincli.plugs import catalog
+
+        catalog.validate_name(name)
+        self._refuse_if_installed(name)
+        source = catalog.fetch_plug_source(name)
+        lp = self._validate_source(name, source)
+        if lp.instance.name != name:
             raise FinError(
-                f"Don't know where to fetch plug '{name}'. Provide a git URL, "
-                "or wait for the catalog (coming in a later release).",
-                title="Not Implemented",
+                f"The downloaded plug declares name '{lp.instance.name}', "
+                f"expected '{name}' — refusing to install it.",
+                title="Invalid Plug",
             )
+        return self._place(name, source)
+
+    def _install_from_git(self, url: str) -> Path:
+        """Clone a plug repo and install the one ``<name>.py`` plug in it.
+
+        Plug files are looked for in the clone's root and in its ``plugs/``
+        sub-directory; the repo must contain exactly one loadable plug.
+        """
+        import tempfile
+
+        from fincli.plugs import catalog
+        from fincli.plugs.loader import load_plug_file
+
         if shutil.which("git") is None:
             raise FinError("git is required to install plugs but was not found.")
 
-        # Clone into a staging dir under App/ first, then relocate by type.
-        Config.ensure_dirs()
-        staging_parent = Config.plug_type_dir("APP")
-        staging_parent.mkdir(parents=True, exist_ok=True)
-        dest = staging_parent / _repo_basename(url)
-        if dest.exists():
-            raise FinError(f"Plug directory already exists: {dest}")
-        try:
-            subprocess.run(
-                ["git", "clone", "--depth", "1", url, str(dest)],
-                check=True,
-                capture_output=True,
-                text=True,
+        with tempfile.TemporaryDirectory(prefix="fin-plug-git-") as tmp:
+            clone = Path(tmp) / "repo"
+            try:
+                subprocess.run(
+                    ["git", "clone", "--depth", "1", url, str(clone)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                raise FinError(f"git clone failed: {exc.stderr.strip()}") from exc
+
+            candidates = [
+                py
+                for base in (clone, clone / "plugs")
+                if base.is_dir()
+                for py in sorted(base.glob("*.py"))
+                if not py.name.startswith((".", "_"))
+            ]
+            plugs = [lp for lp in map(load_plug_file, candidates) if lp is not None]
+            if not plugs:
+                raise FinError(
+                    f"No loadable Fin plug found in {url} (looked for "
+                    "<name>.py at the repo root and under plugs/).",
+                    title="Invalid Plug",
+                )
+            if len(plugs) > 1:
+                names = ", ".join(sorted(lp.instance.name for lp in plugs))
+                raise FinError(
+                    f"{url} contains multiple plugs ({names}) — install them "
+                    "individually by name from the catalog instead.",
+                    title="Invalid Plug",
+                )
+            lp = plugs[0]
+            name = catalog.validate_name(lp.instance.name)
+            self._refuse_if_installed(name)
+            return self._place(name, lp.path.read_text(encoding="utf-8"))
+
+    def _refuse_if_installed(self, name: str) -> None:
+        """Raise FinError if *name* already exists on disk or in the cache."""
+        dest = Config.PLUGS_DIR / f"{name}.py"
+        existing = str(dest) if dest.exists() else None
+        if existing is None:
+            try:
+                existing = self.get(name).path
+            except NotFound:
+                return
+        raise FinError(
+            f"Plug '{name}' is already installed at {existing}. "
+            f"Run 'fin plugs uninstall {name}' first to reinstall."
+        )
+
+    @staticmethod
+    def _validate_source(name: str, source: str):
+        """Load *source* from a scratch dir; raise unless it is a real plug."""
+        import tempfile
+
+        from fincli.plugs.loader import load_plug_file
+
+        with tempfile.TemporaryDirectory(prefix="fin-plug-") as tmp:
+            staged = Path(tmp) / f"{name}.py"
+            staged.write_text(source, encoding="utf-8")
+            lp = load_plug_file(staged)
+        if lp is None:
+            raise FinError(
+                f"The downloaded file for '{name}' is not a loadable Fin "
+                "plug — refusing to install it.",
+                title="Invalid Plug",
             )
-        except subprocess.CalledProcessError as exc:
-            raise FinError(f"git clone failed: {exc.stderr.strip()}") from exc
+        return lp
 
-        # Relocate to the correct type dir based on the plug's declared type.
-        from fincli.plugs.loader import load_plug_dir
-        from fincli.plugs.base import PlugType
-
-        lp = load_plug_dir(dest, PlugType.APP)
-        if lp is not None and lp.instance.plug_type != PlugType.APP:
-            correct_dir = Config.plug_type_dir(lp.instance.plug_type.value)
-            correct_dir.mkdir(parents=True, exist_ok=True)
-            final = correct_dir / dest.name
-            shutil.move(str(dest), str(final))
-            dest = final
-
+    def _place(self, name: str, source: str) -> Path:
+        """Write the validated plug source to PLUGS_DIR and re-sync."""
+        Config.ensure_dirs()
+        Config.PLUGS_DIR.mkdir(parents=True, exist_ok=True)
+        dest = Config.PLUGS_DIR / f"{name}.py"
+        dest.write_text(source, encoding="utf-8")
         self.sync()
         return dest
 
     def uninstall(self, name: str) -> Path:
-        """Remove an installed plug's directory from disk."""
+        """Remove an installed plug file from disk."""
         record = self.get(name)
         path = Path(record.path)
-        if not path.exists():
-            raise NotFound(f"Plug '{name}' directory not found at {path}.")
-        shutil.rmtree(path)
+        if not path.is_file():
+            raise NotFound(f"Plug '{name}' not found on disk at {path}.")
+        path.unlink()
         self.sync()
         return path
 
@@ -207,8 +280,3 @@ def _looks_like_git(value: str) -> bool:
     return value.startswith(
         ("http://", "https://", "git@", "ssh://")
     ) or value.endswith(".git")
-
-
-def _repo_basename(url: str) -> str:
-    base = url.rstrip("/").split("/")[-1]
-    return base[:-4] if base.endswith(".git") else base

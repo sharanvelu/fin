@@ -16,8 +16,7 @@ from fincli.commands import load_reserved
 @pytest.fixture
 def plugs_dir(tmp_path, monkeypatch):
     d = tmp_path / "plugs"
-    for sub in ("App", "Asset", "Global"):
-        (d / sub).mkdir(parents=True)
+    d.mkdir(parents=True)
     monkeypatch.setattr(Config, "PLUGS_DIR", d)
     return d
 
@@ -46,7 +45,6 @@ def test_resolve_plug_command(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="App",
         name="myapp",
         class_name="MyApp",
         plug_type="APP",
@@ -68,7 +66,6 @@ def test_reserved_beats_plug_of_same_name(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="App",
         name="myapp",
         class_name="MyApp",
         plug_type="APP",
@@ -87,7 +84,6 @@ def test_resolve_plug_alias(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="App",
         name="myapp",
         class_name="MyApp",
         plug_type="APP",
@@ -106,7 +102,6 @@ def test_resolve_global_plug(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="Global",
         name="gtool",
         class_name="GTool",
         plug_type="GLOBAL",
@@ -126,7 +121,6 @@ def test_resolve_passes_args_to_handler(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="App",
         name="myapp",
         class_name="MyApp",
         plug_type="APP",
@@ -144,7 +138,6 @@ def test_fin_plugs_aux_resolution(plugs_dir, plug_factory, tmp_path):
 """
     plug_factory(
         plugs_dir,
-        type_sub="Asset",
         name="auxplug",
         class_name="Aux",
         plug_type="ASSET",

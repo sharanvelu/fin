@@ -52,7 +52,8 @@ a declarative plugin system, and a single audited path to the Docker daemon.
 - **Docker** running locally (Docker Desktop, Colima, Rancher Desktop, or Podman
   with a Docker-compatible socket — Fin auto-detects the common socket paths).
 - **git** — used by the installer to seed the bundled plugs, and by
-  `fin plugs install`. (Optional: if git is missing, install plugs manually.)
+  `fin plugs install <git-url>`. (Optional: catalog installs like
+  `fin plugs install laravel` fetch over plain HTTPS and need no git.)
 
 > The prebuilt binary needs **no Python, pip, or virtualenv** on the host.
 > Python 3.11+ is only required if you install [from source](#install-from-source-developers).
@@ -66,7 +67,7 @@ installer does both.
 ### One-liner (prebuilt binary)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/master/install.sh)"
 ```
 
 The installer:
@@ -74,23 +75,29 @@ The installer:
 1. Detects your OS/arch and downloads the matching release tarball
    `fin-<os>-<arch>.tar.gz` (`os` ∈ `macos`/`linux`, `arch` ∈ `arm64`/`x64`)
    from the GitHub Releases of `sharanvelu/fin`.
-2. Unpacks it into `~/.fin-cli` (override with `FIN_HOME_DIR`), giving
-   `~/.fin-cli/fin/fin` plus its `_internal/` runtime.
+2. Unpacks it into `~/.local/lib/fin-cli` (created if missing; override with
+   `FIN_HOME_DIR`), giving `~/.local/lib/fin-cli/fin/fin` plus its
+   `_internal/` runtime. The whole install is user-local — the installer
+   never uses `sudo`.
 3. Symlinks the `fin` launcher into the first writable directory on your `PATH`
    (tries `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`; override with
    `FIN_BIN_DIR`).
 4. On macOS, strips the `com.apple.quarantine` attribute so the unsigned binary
    runs without a Gatekeeper prompt.
-5. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by `git clone`-ing
-   the `sharanvelu/fin-plugs` repo — only if `~/.fin/plugs` is absent and `git`
-   is available.
+5. Runs `fin --version` once — the first launch of the unsigned binary is slow
+   (~15s while the OS verifies it), so the installer pays that cost up front
+   and your first real `fin` command starts instantly.
+6. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by copying
+   the flat `plugs/*.py` files from a shallow clone of the `sharanvelu/fin-plugs`
+   repo — only if `~/.fin/plugs` is absent and `git` is available. (More plugs:
+   `fin plugs install <name>`.)
 
 Installer environment overrides:
 
 | Variable           | Purpose                                     | Default                            |
 | ------------------ | ------------------------------------------- | ---------------------------------- |
-| `FIN_VERSION`      | release to install — `latest` = the rolling prerelease built from every master merge; a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
-| `FIN_HOME_DIR`     | binary install location                     | `$HOME/.fin-cli`                   |
+| `FIN_VERSION`      | release to install — `latest` = the rolling prerelease pointing at the newest versioned release; a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
+| `FIN_HOME_DIR`     | binary install location                     | `$HOME/.local/lib/fin-cli`         |
 | `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
 | `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
 | `FIN_RELEASE_REPO` | GitHub repo hosting the releases            | `sharanvelu/fin`                   |
@@ -103,12 +110,14 @@ If you'd rather not pipe a script, grab the tarball for your platform from the
 
 ```bash
 # Pick the artifact for your platform, e.g. fin-macos-arm64.tar.gz
-tar -C ~/.fin-cli -xzf fin-macos-arm64.tar.gz     # → ~/.fin-cli/fin/fin + _internal/
-xattr -dr com.apple.quarantine ~/.fin-cli/fin     # macOS only (unsigned binary)
-ln -sf ~/.fin-cli/fin/fin /usr/local/bin/fin      # or any writable dir on your PATH
+mkdir -p ~/.local/lib/fin-cli ~/.local/bin
+tar -C ~/.local/lib/fin-cli -xzf fin-macos-arm64.tar.gz     # → fin/fin + _internal/
+xattr -dr com.apple.quarantine ~/.local/lib/fin-cli/fin     # macOS only (unsigned binary)
+ln -sf ~/.local/lib/fin-cli/fin/fin ~/.local/bin/fin        # or any writable dir on your PATH
 
 # Seed the plugs (not bundled in the binary):
-git clone https://github.com/sharanvelu/fin-plugs.git ~/.fin/plugs
+git clone --depth 1 https://github.com/sharanvelu/fin-plugs.git /tmp/fin-plugs
+mkdir -p ~/.fin/plugs && cp /tmp/fin-plugs/plugs/*.py ~/.fin/plugs/
 
 fin --help
 ```
@@ -146,7 +155,7 @@ For development, plugs still load from the fixed `~/.fin/plugs` directory
 your plugs checkout once:
 
 ```bash
-ln -s <fin-plugs repo>/plugs-tree ~/.fin/plugs
+ln -s <fin-plugs repo>/plugs ~/.fin/plugs
 ```
 
 ## Quickstart (Laravel)
@@ -253,8 +262,8 @@ delegated to a plug.
 | ------- | ----------- |
 | `fin plugs list` (alias `ls`) | List installed plugs and their commands. |
 | `fin plugs info <name>` | Show one plug's metadata and path. |
-| `fin plugs search <query>` | Search the remote catalog *(not yet wired up — reports a clear message)*. |
-| `fin plugs install <name\|git-url>` | Install a plug from a git URL (catalog install pending). |
+| `fin plugs search <query>` | Search the remote plug catalog by name/description. |
+| `fin plugs install <name\|git-url>` | Install a plug by catalog name (e.g. `fin plugs install laravel`) or from a git URL. |
 | `fin plugs uninstall <name>` | Remove an installed plug from disk. |
 
 ### AI agents
@@ -405,26 +414,32 @@ fin <command> [args...]
   1. reserved (system) commands   ← owned by Fin, never delegated
   2. the FIN_APP / FIN_PLUG plug   ← primary app plug
   3. the FIN_PLUGS plugs           ← auxiliary plugs, in declared order
-  4. GLOBAL plugs                  ← everything under Global/
+  4. GLOBAL plugs                  ← every plug declaring PlugType.GLOBAL
 ```
 
 The first match wins. Plug lookup is lazy and de-duplicated by plug name.
 
 ## Writing a plug
 
-A plug is a Python package under the plugs directory, grouped by type:
+A plug is a single Python file in the plugs directory; its type is declared
+by the class's `plug_type` attribute, not by where the file sits:
 
 ```
 <PLUGS_DIR>/
-  App/<name>/__init__.py      # PlugType.APP
-  Asset/<name>/__init__.py    # PlugType.ASSET
-  Global/<name>/__init__.py   # PlugType.GLOBAL
+  <name>.py                   # one FinPlug subclass; filename == plug name
 ```
 
 `PLUGS_DIR` is fixed at `~/.fin/plugs` (it moves with `FIN_DATA_DIR`). The loader
-imports each package by file path, finds the single class that subclasses
+imports each file by path, finds the single class that subclasses
 `FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and calls
 `setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
+
+Catalog plugs come from the [fin-plugs](https://github.com/sharanvelu/fin-plugs)
+repository: `fin plugs install <name>` fetches `plugs/<name>.py` from its
+master branch over plain HTTPS, and `fin plugs search` reads the generated
+`catalog.json` published as an asset of the repo's latest release. Point
+`FIN_PLUGS_REPO_RAW` (plug files) and `FIN_PLUGS_CATALOG_URL` (catalog) at a
+fork/mirror to install from somewhere else.
 
 **Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
 objects and asks `PlugContext` to exec inside a running container — it must never
@@ -433,7 +448,7 @@ daemon.
 
 ### Minimal ASSET plug
 
-`Asset/memcached/__init__.py`:
+`<PLUGS_DIR>/memcached.py`:
 
 ```python
 from __future__ import annotations
@@ -464,7 +479,7 @@ Enable it to auto-start with `fin config enable memcached`, or list it in
 
 ### Minimal APP plug
 
-`App/static/__init__.py`:
+`<PLUGS_DIR>/static.py`:
 
 ```python
 from __future__ import annotations
@@ -581,7 +596,8 @@ and exits with code `2`.
 (or `FIN_PLUG`) set in the project's `.env`.
 
 **"App plug '<name>' is not installed."** — Check `fin plugs list`; ensure the
-plug exists under `App/<name>` in your plugs dir (`~/.fin/plugs`).
+plug exists in your plugs dir (`~/.fin/plugs/<name>.py`), or install it with
+`fin plugs install <name>`.
 
 **The `fin` command isn't found** — the installer warns if its chosen bin
 directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PATH"`.

@@ -49,7 +49,6 @@ def synthetic_plug(tmp_path, monkeypatch):
     plugs_dir = tmp_path / "plugs"
     write_plug(
         plugs_dir,
-        type_sub="App",
         name="laravel",
         class_name="LaravelPlug",
         plug_type="APP",

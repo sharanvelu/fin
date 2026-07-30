@@ -51,12 +51,14 @@ merge PR bumping version in pyproject.toml
               never trigger `push: tags:` — dispatch is the exception)
   → build.yml builds the PyInstaller binary natively per OS/arch
               (macos-arm64, linux-x64, linux-arm64; no cross-compiling)
-              and publishes the immutable vX.Y.Z GitHub Release
+              then publishes the immutable vX.Y.Z GitHub Release AND moves the
+              rolling `latest` prerelease (install.sh's default download) to
+              the same artifacts
 ```
 
-Every push to master also rebuilds the rolling `latest` prerelease, which is
-what `install.sh` downloads by default. `workflow_dispatch` on `build.yml`
-with `dry_run: true` builds all platforms without publishing anything.
+Builds run ONLY at v* tags — ordinary pushes to master publish nothing.
+`workflow_dispatch` on `build.yml` with `dry_run: true` builds all platforms
+without publishing anything.
 
 ## Hardening conventions (apply to every workflow)
 

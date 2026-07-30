@@ -244,27 +244,36 @@ entrypoints, and the dashboard at `traefik.localhost`. Because routing is
 label-driven, starting any correctly-labelled container is sufficient to route
 it — the proxy needs no per-project configuration.
 
-## 7. The registry: SQLite + directory grouping
+## 7. The registry: SQLite over flat plug files
 
-The **directory layout is the source of truth** — `PLUGS_DIR/{App,Asset,Global}/<name>/`.
-The SQLite cache at `~/.fin/registry.db` exists only so Fin can answer "what
-plugs exist, of what type, with what commands" without importing every plug on
-every invocation.
+The **plugs on disk are the source of truth** — flat `PLUGS_DIR/<name>.py`
+files, one per plug. A plug's type comes from its declared `plug_type`, never
+from its location. The SQLite cache at
+`~/.fin/registry.db` exists only so Fin can answer "what plugs exist, of what
+type, with what commands" without importing every plug on every invocation.
 
 - `Registry.sync()` re-scans the tree (`load_all`), wipes the table, and inserts
   one row per successfully-loaded plug (`name`, `version`, `plug_type`,
   `description`, `commands`, `path`). It runs implicitly on `all`/`get`/`by_type`
   (via `refresh=True`) and after install/uninstall, so the cache never drifts
   meaningfully from disk. Failed plugs are simply absent.
-- `install(name|git-url)` clones into a staging dir under `App/`, loads it to read
-  its declared `plug_type`, then relocates it into the correct type directory.
-  Catalog-based search/install are stubbed to raise a clear "not yet available"
-  `FinError` so the command surface exists and is testable.
+- `install(<name>)` fetches `plugs/<name>.py` from the fin-plugs repo over plain
+  HTTPS (raw.githubusercontent.com; base URL `Config.PLUGS_REPO_RAW`, overridable
+  via `FIN_PLUGS_REPO_RAW`), validates it loads as a `FinPlug` whose declared name
+  matches, and writes it to `PLUGS_DIR/<name>.py`. `install(<git-url>)`
+  clones into a temp dir, requires exactly one loadable plug file (repo root
+  or `plugs/`), and installs it the same flat way.
+- `search(query)` filters the generated `catalog.json` that the fin-plugs
+  release workflow publishes as an asset of each release
+  (`Config.PLUGS_CATALOG_URL`, default the repo's `releases/latest/download`
+  URL) by name/description and flags installed entries.
 
-Directory grouping (rather than a flat dir) makes a plug's type obvious from its
-path, lets the loader resolve a name within a type quickly, and mirrors DockR's
-mental model. SQLite is chosen over a JSON blob because it gives indexed
-by-type/by-name queries for free and is a stdlib dependency.
+One file per plug (rather than package dirs grouped by type) makes the install
+URL deterministic from the name alone — `<repo raw>/plugs/<name>.py` — so
+installs need no git binary, no GitHub API, and no listing round-trip; the
+trade-off is that a plug can never grow beyond a single module. SQLite is
+chosen over a JSON blob because it gives indexed by-type/by-name queries for
+free and is a stdlib dependency.
 
 ## 8. Error handling and the exit-code contract
 
@@ -336,9 +345,11 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   `pyproject.toml` changes on master) and attaches the tarballs to the
   GitHub Release.
   `install.sh` detects OS/arch, downloads the matching tarball from
-  `sharanvelu/fin` Releases, unpacks it to `~/.fin-cli`, symlinks the launcher
-  onto `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
-  fix is notarization), and seeds plugs into `~/.fin/plugs`.
+  `sharanvelu/fin` Releases, unpacks it to `~/.local/lib/fin-cli` (created if
+  missing; entirely user-local, never sudo), symlinks the launcher onto
+  `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
+  fix is notarization), runs `fin --version` once to absorb the slow first
+  launch of the unsigned binary, and seeds plugs into `~/.fin/plugs`.
 - **From source (developers).** The `fin = fincli.__main__:main` console script in
   `pyproject.toml` and the repo-root `fin` bash launcher both run the module
   against system Python — no freezing step.

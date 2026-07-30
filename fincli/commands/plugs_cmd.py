@@ -16,13 +16,14 @@ from fincli.ui.console import console, error, info, success
     subcommands=(
         ("list", "List installed plugs (name, version, type, commands)."),
         ("info <name>", "Show detailed info for an installed plug."),
-        ("search <query>", "Search the plug catalog (coming soon)."),
-        ("install <name|git-url>", "Install a plug into the plugs directory."),
+        ("search <query>", "Search the remote plug catalog."),
+        ("install <name|git-url>", "Install a plug from the catalog or a git repo."),
         ("uninstall <name>", "Remove an installed plug."),
     ),
     examples=(
         "fin plugs list",
-        "fin plugs info laravel",
+        "fin plugs search postgres",
+        "fin plugs install laravel",
         "fin plugs install https://github.com/acme/fin-plug-django.git",
     ),
 )
@@ -89,12 +90,37 @@ def _info(registry: Registry, name: str | None) -> int:
 
 
 def _search(registry: Registry, query: str | None) -> int:
+    from rich.table import Table
+
     if not query:
         error("Usage: fin plugs search <query>", title="Invalid Argument")
         return EXIT_USER
-    results = registry.search(query)  # raises FinError (Not Implemented) for now
-    for item in results:
-        console.print(f"  {item}")
+    results = registry.search(query)
+    if not results:
+        info(f"No plugs matching '{query}' in the catalog.")
+        return EXIT_OK
+    table = Table(
+        title=f"Catalog plugs matching '{query}'",
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("Name", style="bold")
+    table.add_column("Version", style="magenta")
+    table.add_column("Type")
+    table.add_column("Description")
+    table.add_column("Installed")
+    type_colors = {"APP": "green", "ASSET": "cyan", "GLOBAL": "yellow"}
+    for entry in results:
+        plug_type = str(entry.get("type", "-"))
+        color = type_colors.get(plug_type, "white")
+        table.add_row(
+            str(entry.get("name", "-")),
+            str(entry.get("version", "-")),
+            f"[{color}]{plug_type}[/{color}]",
+            str(entry.get("description", "") or "-"),
+            "[green]yes[/green]" if entry.get("installed") else "no",
+        )
+    console.print(table)
     return EXIT_OK
 
 
