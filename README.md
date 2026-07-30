@@ -51,18 +51,17 @@ a declarative plugin system, and a single audited path to the Docker daemon.
 
 - **Docker** running locally (Docker Desktop, Colima, Rancher Desktop, or Podman
   with a Docker-compatible socket — Fin auto-detects the common socket paths).
-- **git** — used by the installer to seed the bundled plugs, and by
-  `fin plugs install <git-url>`. (Optional: catalog installs like
-  `fin plugs install laravel` fetch over plain HTTPS and need no git.)
+- **git** — used by `fin plugs install <git-url>`. (Optional: catalog installs
+  like `fin plugs install laravel` fetch over plain HTTPS and need no git.)
 
 > The prebuilt binary needs **no Python, pip, or virtualenv** on the host.
 > Python 3.11+ is only required if you install [from source](#install-from-source-developers).
 
 ## Install
 
-Fin ships as a prebuilt, standalone binary per OS/arch. A full install is the
-**binary on your `PATH`** plus **plugs seeded into `~/.fin/plugs`** — the
-installer does both.
+Fin ships as a prebuilt, standalone binary per OS/arch. The installer puts the
+**binary on your `PATH`**; plugs are installed separately with
+`fin plugs install <name>`.
 
 ### One-liner (prebuilt binary)
 
@@ -87,10 +86,9 @@ The installer:
 5. Runs `fin --version` once — the first launch of the unsigned binary is slow
    (~15s while the OS verifies it), so the installer pays that cost up front
    and your first real `fin` command starts instantly.
-6. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by copying
-   the flat `plugs/*.py` files from a shallow clone of the `sharanvelu/fin-plugs`
-   repo — only if `~/.fin/plugs` is absent and `git` is available. (More plugs:
-   `fin plugs install <name>`.)
+6. Creates the plugs directory at `~/.fin/plugs` (override with
+   `FIN_DATA_DIR`). Plugs themselves are not bundled — install them with
+   `fin plugs install <name>`.
 
 Installer environment overrides:
 
@@ -101,7 +99,6 @@ Installer environment overrides:
 | `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
 | `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
 | `FIN_RELEASE_REPO` | GitHub repo hosting the releases            | `sharanvelu/fin`                   |
-| `FIN_PLUGS_REPO`   | git URL for the plugs repo to seed          | `sharanvelu/fin-plugs`             |
 
 ### Manual download from Releases
 
@@ -115,9 +112,8 @@ tar -C ~/.local/lib/fin-cli -xzf fin-macos-arm64.tar.gz     # → fin/fin + _int
 xattr -dr com.apple.quarantine ~/.local/lib/fin-cli/fin     # macOS only (unsigned binary)
 ln -sf ~/.local/lib/fin-cli/fin/fin ~/.local/bin/fin        # or any writable dir on your PATH
 
-# Seed the plugs (not bundled in the binary):
-git clone --depth 1 https://github.com/sharanvelu/fin-plugs.git /tmp/fin-plugs
-mkdir -p ~/.fin/plugs && cp /tmp/fin-plugs/plugs/*.py ~/.fin/plugs/
+# Install the plugs you need (not bundled in the binary):
+fin plugs install laravel
 
 fin --help
 ```

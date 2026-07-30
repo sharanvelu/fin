@@ -3,7 +3,7 @@
 # Build a standalone `fin` binary with PyInstaller (onedir) and package a
 # release tarball. The target host needs NO Python — the binary embeds its own
 # interpreter + fincli. Plugs are loaded at runtime from ~/.fin/plugs (they are
-# NOT bundled; see install.sh, which seeds them from the fin-plugs repo).
+# NOT bundled; users install them with `fin plugs install <name>`).
 #
 # Output:
 #   dist/fin/                      the onedir tree (executable + _internal/)

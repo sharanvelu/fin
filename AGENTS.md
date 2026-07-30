@@ -14,7 +14,7 @@ containers by hostname.
 
 ```
 fin                       bash launcher (source/dev path; sets PYTHONPATH, execs python -m fincli)
-install.sh                installer for END USERS: downloads a prebuilt binary from Releases, symlinks it, seeds plugs
+install.sh                installer for END USERS: downloads a prebuilt binary from Releases, symlinks it, creates ~/.fin/plugs
 packaging/build.sh        builds the standalone binary (PyInstaller onedir) → dist/fin-<os>-<arch>.tar.gz
 packaging/fin_entry.py    PyInstaller entry point (calls fincli.__main__:main)
 .github/workflows/            CI: PR gates (tests, code-style, static-analysis, build-check) + release (tag.yml → build.yml)

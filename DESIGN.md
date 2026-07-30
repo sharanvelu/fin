@@ -349,12 +349,13 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   missing; entirely user-local, never sudo), symlinks the launcher onto
   `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
   fix is notarization), runs `fin --version` once to absorb the slow first
-  launch of the unsigned binary, and seeds plugs into `~/.fin/plugs`.
+  launch of the unsigned binary, and creates the plugs directory at
+  `~/.fin/plugs`.
 - **From source (developers).** The `fin = fincli.__main__:main` console script in
   `pyproject.toml` and the repo-root `fin` bash launcher both run the module
   against system Python — no freezing step.
 
 **Plugs are never bundled.** They stay uncompiled `.py` under
 `~/.fin/plugs/{App,Asset,Global}` and are imported at runtime by the loader (§7),
-regardless of whether Fin itself is the binary or the source. `install.sh` seeds
-them by `git clone`-ing the plugs repo; developers symlink their checkout there.
+regardless of whether Fin itself is the binary or the source. Users install
+them with `fin plugs install <name>`; developers symlink their checkout there.
