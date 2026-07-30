@@ -4,7 +4,7 @@
 #
 # No Python, pip, or virtualenv is required on the host: the binary embeds its
 # own interpreter. Docker is still needed at runtime. Plugs are installed
-# separately into ~/.fin/plugs (this script seeds them from the fin-plugs repo).
+# separately into ~/.fin/plugs via `fin plugs install <name>`.
 #
 # Usage:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/master/install.sh)"
@@ -16,7 +16,7 @@
 #   3. Symlinks the `fin` launcher into the first writable PATH directory.
 #   4. Runs `fin --version` once so the slow first launch of the unsigned
 #      binary happens here, not on the user's first command.
-#   5. Seeds plugs into ~/.fin/plugs (clones fin-plugs if git is available).
+#   5. Creates the plugs directory at ~/.fin/plugs.
 #
 # Configurable via environment variables:
 #   FIN_VERSION       release to install ("latest" or e.g. 0.1.0)  (default: latest)
@@ -24,7 +24,6 @@
 #   FIN_BIN_DIR       where to place the `fin` symlink             (default: auto-detected)
 #   FIN_DATA_DIR      per-user data dir (config, registry, plugs)  (default: $HOME/.fin)
 #   FIN_RELEASE_REPO  GitHub repo hosting the releases             (default: sharanvelu/fin)
-#   FIN_PLUGS_REPO    git URL for the plugs repo                   (default: sharanvelu/fin-plugs)
 
 set -euo pipefail
 
@@ -33,7 +32,6 @@ FIN_VERSION="${FIN_VERSION#v}"   # tolerate a leading "v" (release tags are vX.Y
 FIN_HOME_DIR="${FIN_HOME_DIR:-$HOME/.local/lib/fin-cli}"
 FIN_DATA_DIR="${FIN_DATA_DIR:-$HOME/.fin}"
 FIN_RELEASE_REPO="${FIN_RELEASE_REPO:-sharanvelu/fin}"
-FIN_PLUGS_REPO="${FIN_PLUGS_REPO:-https://github.com/sharanvelu/fin-plugs.git}"
 
 # --- pretty output ----------------------------------------------------------
 c_green=$'\033[0;32m'; c_red=$'\033[0;31m'; c_yellow=$'\033[0;33m'
@@ -90,6 +88,7 @@ mkdir -p "$FIN_HOME_DIR" 2>/dev/null \
   || die "Cannot create $FIN_HOME_DIR (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
 [ -w "$FIN_HOME_DIR" ] \
   || die "$FIN_HOME_DIR is not writable (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
+if [ -e "$FIN_HOME_DIR/fin/fin" ]; then INSTALL_VERB="updated"; else INSTALL_VERB="installed"; fi
 rm -rf "$FIN_HOME_DIR/fin"                 # clean previous install (idempotent)
 tar -C "$FIN_HOME_DIR" -xzf "$TMP/$ARTIFACT"
 [ -x "$FIN_HOME_DIR/fin/fin" ] || die "Unexpected archive layout (missing fin/fin)."
@@ -144,26 +143,10 @@ else
   warn "Warm-up run failed; your first manual run of fin may be slow."
 fi
 
-# --- seed plugs -------------------------------------------------------------
+# --- plugs directory ----------------------------------------------------------
 # Plugs live in ~/.fin/plugs as flat <name>.py files. They are NOT part of the
-# binary; seed them from the plugs repo's plugs/ directory so `fin up` works
-# out of the box. (After install, `fin plugs install <name>` adds more.)
-if [ -d "$FIN_DATA_DIR/plugs" ] && [ -n "$(ls -A "$FIN_DATA_DIR/plugs" 2>/dev/null)" ]; then
-  info "Plugs already present at $FIN_DATA_DIR/plugs (leaving as-is)."
-elif command -v git >/dev/null 2>&1; then
-  info "Seeding plugs into $FIN_DATA_DIR/plugs"
-  mkdir -p "$FIN_DATA_DIR/plugs"
-  PLUGS_TMP="$(mktemp -d)"
-  if git clone --quiet --depth 1 "$FIN_PLUGS_REPO" "$PLUGS_TMP/fin-plugs" \
-     && cp "$PLUGS_TMP/fin-plugs/plugs/"*.py "$FIN_DATA_DIR/plugs/"; then
-    ok "Plugs installed."
-  else
-    warn "Could not seed plugs from $FIN_PLUGS_REPO — install them with 'fin plugs install <name>'."
-  fi
-  rm -rf "$PLUGS_TMP"
-else
-  warn "git not found — install plugs with 'fin plugs install <name>' instead."
-fi
+# binary; install them with `fin plugs install <name>`.
+mkdir -p "$FIN_DATA_DIR/plugs"
 
 # --- PATH hint --------------------------------------------------------------
 case ":$PATH:" in
@@ -172,6 +155,19 @@ case ":$PATH:" in
      warn "  export PATH=\"$BIN_DIR:\$PATH\"" ;;
 esac
 
+# --- success banner ----------------------------------------------------------
+c_red_b=$'\033[1;31m'; c_grn_b=$'\033[1;32m'; c_mag_b=$'\033[1;35m'
+c_bold=$'\033[1m'; c_italic=$'\033[3m'
 echo
-ok  "Fin installed. Run: ${c_cyan}fin --help${c_reset}"
-info "Requires a running Docker engine. Plugs live in: $FIN_DATA_DIR/plugs"
+printf '%s\n' \
+  "         ${c_red_b}███████╗ ${c_grn_b}██╗ ${c_mag_b}███╗   ██╗${c_reset}" \
+  "         ${c_red_b}██╔════╝ ${c_grn_b}██║ ${c_mag_b}████╗  ██║${c_reset}" \
+  "         ${c_red_b}█████╗   ${c_grn_b}██║ ${c_mag_b}██╔██╗ ██║${c_reset}" \
+  "         ${c_red_b}██╔══╝   ${c_grn_b}██║ ${c_mag_b}██║╚██╗██║${c_reset}" \
+  "         ${c_red_b}██║      ${c_grn_b}██║ ${c_mag_b}██║ ╚████║${c_reset}" \
+  "         ${c_red_b}╚═╝      ${c_grn_b}╚═╝ ${c_mag_b}╚═╝  ╚═══╝${c_reset}"
+echo
+printf '         is now %ssuccessfully%s %s!\n' "${c_italic}${c_green}" "$c_reset" "$INSTALL_VERB"
+echo
+info "Run: ${c_cyan}fin --help${c_reset}  (requires a running Docker engine)"
+info "Install plugs with: fin plugs install <name>"
