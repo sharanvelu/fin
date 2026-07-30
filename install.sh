@@ -88,6 +88,7 @@ mkdir -p "$FIN_HOME_DIR" 2>/dev/null \
   || die "Cannot create $FIN_HOME_DIR (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
 [ -w "$FIN_HOME_DIR" ] \
   || die "$FIN_HOME_DIR is not writable (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
+if [ -e "$FIN_HOME_DIR/fin/fin" ]; then INSTALL_VERB="updated"; else INSTALL_VERB="installed"; fi
 rm -rf "$FIN_HOME_DIR/fin"                 # clean previous install (idempotent)
 tar -C "$FIN_HOME_DIR" -xzf "$TMP/$ARTIFACT"
 [ -x "$FIN_HOME_DIR/fin/fin" ] || die "Unexpected archive layout (missing fin/fin)."
@@ -154,6 +155,19 @@ case ":$PATH:" in
      warn "  export PATH=\"$BIN_DIR:\$PATH\"" ;;
 esac
 
+# --- success banner ----------------------------------------------------------
+c_red_b=$'\033[1;31m'; c_grn_b=$'\033[1;32m'; c_mag_b=$'\033[1;35m'
+c_bold=$'\033[1m'; c_italic=$'\033[3m'
 echo
-ok  "Fin installed. Run: ${c_cyan}fin --help${c_reset}"
-info "Requires a running Docker engine. Install plugs with: fin plugs install <name>"
+printf '%s\n' \
+  "         ${c_red_b}███████╗ ${c_grn_b}██╗ ${c_mag_b}███╗   ██╗${c_reset}" \
+  "         ${c_red_b}██╔════╝ ${c_grn_b}██║ ${c_mag_b}████╗  ██║${c_reset}" \
+  "         ${c_red_b}█████╗   ${c_grn_b}██║ ${c_mag_b}██╔██╗ ██║${c_reset}" \
+  "         ${c_red_b}██╔══╝   ${c_grn_b}██║ ${c_mag_b}██║╚██╗██║${c_reset}" \
+  "         ${c_red_b}██║      ${c_grn_b}██║ ${c_mag_b}██║ ╚████║${c_reset}" \
+  "         ${c_red_b}╚═╝      ${c_grn_b}╚═╝ ${c_mag_b}╚═╝  ╚═══╝${c_reset}"
+echo
+printf '         is now %ssuccessfully%s %s!\n' "${c_italic}${c_green}" "$c_reset" "$INSTALL_VERB"
+echo
+info "Run: ${c_cyan}fin --help${c_reset}  (requires a running Docker engine)"
+info "Install plugs with: fin plugs install <name>"
