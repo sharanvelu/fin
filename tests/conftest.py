@@ -185,7 +185,6 @@ def isolate_config(tmp_path, monkeypatch):
 def write_plug(
     plugs_dir: Path,
     *,
-    type_sub: str,
     name: str,
     class_name: str,
     plug_type: str,
@@ -193,13 +192,35 @@ def write_plug(
     description: str = "",
     body_extra: str = "",
 ) -> Path:
-    """Write a minimal FinPlug package under ``plugs_dir/<type_sub>/<name>``.
+    """Write a minimal flat FinPlug file ``plugs_dir/<name>.py``.
 
-    Returns the package directory path.
+    Returns the file path.
     """
-    pkg = plugs_dir / type_sub / name
-    pkg.mkdir(parents=True, exist_ok=True)
-    source = f'''
+    source = plug_source(
+        name=name,
+        class_name=class_name,
+        plug_type=plug_type,
+        version=version,
+        description=description,
+        body_extra=body_extra,
+    )
+    plugs_dir.mkdir(parents=True, exist_ok=True)
+    flat = plugs_dir / f"{name}.py"
+    flat.write_text(source, encoding="utf-8")
+    return flat
+
+
+def plug_source(
+    *,
+    name: str,
+    class_name: str,
+    plug_type: str,
+    version: str = "1.0.0",
+    description: str = "",
+    body_extra: str = "",
+) -> str:
+    """Return the source text of a minimal FinPlug subclass."""
+    return f'''
 from fincli.plugs.base import FinPlug, PlugType, PlugCommand
 
 
@@ -210,8 +231,6 @@ class {class_name}(FinPlug):
     description = "{description}"
 {body_extra}
 '''
-    (pkg / "__init__.py").write_text(source, encoding="utf-8")
-    return pkg
 
 
 @pytest.fixture

@@ -1,16 +1,16 @@
 """Plugin loader — discovers and instantiates plugs via importlib.
 
-Discovery model (directory grouping):
+Discovery model — one shape, a flat directory of single-file plugs:
 
     PLUGS_DIR/
-      App/<plug_name>/__init__.py     → defines a FinPlug subclass
-      Asset/<plug_name>/...
-      Global/<plug_name>/...
+      <plug_name>.py      → defines exactly one FinPlug subclass
 
-Each plug is a package directory. The loader imports it, finds the single
-class extending :class:`FinPlug`, instantiates it, calls ``setup()``, and
-returns it. Load failures are reported as warnings — one bad plug never
-crashes Fin.
+For development, symlink the fin-plugs repo's ``plugs/`` directory to
+``PLUGS_DIR`` (``ln -s <fin-plugs repo>/plugs ~/.fin/plugs``); installed
+plugs land in the same directory. The loader imports each file, finds the
+single class extending :class:`FinPlug`, instantiates it, calls ``setup()``,
+and returns it. The plug's type is its declared ``plug_type``. Load failures
+are reported as warnings — one bad plug never crashes Fin.
 """
 
 from __future__ import annotations
@@ -49,91 +49,73 @@ def _find_plug_class(module) -> type[FinPlug] | None:
     return None
 
 
-def _import_package(pkg_dir: Path):
-    """Import a plug package directory and return the module object."""
-    init = pkg_dir / "__init__.py"
-    target = init if init.exists() else pkg_dir
-    mod_name = f"fin_plug_{pkg_dir.parent.name}_{pkg_dir.name}"
-
-    if init.exists():
-        spec = importlib.util.spec_from_file_location(
-            mod_name, init, submodule_search_locations=[str(pkg_dir)]
-        )
-    else:
-        # Single-file plug: <name>.py
-        py = pkg_dir.with_suffix(".py")
-        spec = importlib.util.spec_from_file_location(mod_name, py)
-        target = py
-
+def _import_file(py: Path):
+    """Import a single-file plug and return the module object."""
+    mod_name = f"fin_plug_{py.parent.name}_{py.stem}"
+    spec = importlib.util.spec_from_file_location(mod_name, py)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot build import spec for {target}")
+        raise ImportError(f"Cannot build import spec for {py}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = module
     spec.loader.exec_module(module)
     return module
 
 
-def load_plug_dir(pkg_dir: Path, plug_type: PlugType) -> LoadedPlug | None:
-    """Load a single plug package directory. Returns None on failure."""
+def load_plug_file(py: Path) -> LoadedPlug | None:
+    """Load a single-file plug (``<name>.py``). Returns None on failure."""
     try:
-        module = _import_package(pkg_dir)
+        module = _import_file(py)
     except Exception as exc:  # noqa: BLE001 - we degrade gracefully
-        warning(f"Failed to import plug at {pkg_dir.name}: {exc}")
+        warning(f"Failed to import plug at {py.name}: {exc}")
         return None
 
     plug_cls = _find_plug_class(module)
     if plug_cls is None:
-        warning(f"No FinPlug subclass found in plug '{pkg_dir.name}' — skipping.")
+        warning(f"No FinPlug subclass found in plug '{py.stem}' — skipping.")
         return None
 
     try:
         instance = plug_cls()
         instance.setup()
     except Exception as exc:  # noqa: BLE001
-        warning(f"Failed to initialise plug '{pkg_dir.name}': {exc}")
+        warning(f"Failed to initialise plug '{py.stem}': {exc}")
         return None
 
-    return LoadedPlug(instance=instance, path=pkg_dir, plug_type=plug_type)
+    return LoadedPlug(instance=instance, path=py, plug_type=instance.plug_type)
 
 
-def _iter_plug_dirs(type_dir: Path) -> Iterable[Path]:
-    """Yield candidate plug package dirs under a type directory."""
-    if not type_dir.is_dir():
+def _iter_plug_files(base: Path) -> Iterable[Path]:
+    """Yield the ``<name>.py`` plug candidates directly under *base*."""
+    if not base.is_dir():
         return
-    for child in sorted(type_dir.iterdir()):
+    for child in sorted(base.iterdir()):
         if child.name.startswith((".", "_")):
             continue
-        if child.is_dir():
+        if child.is_file() and child.suffix == ".py":
             yield child
-        elif child.suffix == ".py":
-            yield child.with_suffix("")  # treated as single-file plug
 
 
 def load_all(plugs_dir: Path | None = None) -> list[LoadedPlug]:
-    """Discover and load every plug under all type directories."""
+    """Discover and load every ``<name>.py`` plug in the plugs directory."""
     base = plugs_dir or Config.PLUGS_DIR
     loaded: list[LoadedPlug] = []
-    for type_name, sub in Config.PLUG_TYPE_DIRS.items():
-        type_dir = base / sub
-        for pkg_dir in _iter_plug_dirs(type_dir):
-            lp = load_plug_dir(pkg_dir, PlugType(type_name))
-            if lp is not None:
-                loaded.append(lp)
+    for py in _iter_plug_files(base):
+        lp = load_plug_file(py)
+        if lp is not None:
+            loaded.append(lp)
     return loaded
 
 
 def load_by_name(name: str, plugs_dir: Path | None = None) -> LoadedPlug | None:
-    """Load a single plug by name, searching all type directories.
+    """Load a single plug by name.
 
-    Returns the first match (App → Asset → Global order).
+    Matches the filename first (``<name>.py``), then falls back to a full
+    scan matching each plug's declared ``.name`` attribute.
     """
     base = plugs_dir or Config.PLUGS_DIR
-    for type_name, sub in Config.PLUG_TYPE_DIRS.items():
-        type_dir = base / sub
-        for pkg_dir in _iter_plug_dirs(type_dir):
-            if pkg_dir.name == name:
-                return load_plug_dir(pkg_dir, PlugType(type_name))
-    # Fall back to a full scan matching the plug's declared .name attribute.
+    candidate = base / f"{name}.py"
+    if candidate.is_file():
+        return load_plug_file(candidate)
     for lp in load_all(base):
         if lp.instance.name == name:
             return lp

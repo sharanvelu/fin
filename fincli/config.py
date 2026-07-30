@@ -38,23 +38,34 @@ class Config:
     #: Per-user data directory for Fin (config, sqlite registry, certs, plugs).
     DATA_DIR: Path = _env_path("FIN_DATA_DIR", Path.home() / ".fin")
 
-    #: Directory holding installed plugs, grouped by type:
-    #: ``plugs/App``, ``plugs/Asset``, ``plugs/Global``. Fixed under DATA_DIR
-    #: (``~/.fin/plugs``) — a stable host location so a compiled binary loads
-    #: user-installed plugs from disk rather than from inside the bundle. For
-    #: development, symlink your plugs tree here (``ln -s <repo>/plugs
+    #: Directory holding the plugs, one flat ``<name>.py`` file per plug.
+    #: Fixed under DATA_DIR (``~/.fin/plugs``) — a stable host location so a
+    #: compiled binary loads user-installed plugs from disk rather than from
+    #: inside the bundle. For development, symlink the fin-plugs repo's
+    #: ``plugs/`` directory here (``ln -s <fin-plugs repo>/plugs
     #: ~/.fin/plugs``).
     PLUGS_DIR: Path = DATA_DIR / "plugs"
 
-    #: Sub-directories of :attr:`PLUGS_DIR`, one per plug type.
-    PLUG_TYPE_DIRS: dict[str, str] = {
-        "APP": "App",
-        "ASSET": "Asset",
-        "GLOBAL": "Global",
-    }
-
     #: SQLite registry caching installed-plug metadata for fast lookup.
     REGISTRY_DB: Path = DATA_DIR / "registry.db"
+
+    # --- Remote plug catalog -------------------------------------------------
+    #: Raw-content base URL of the official plug repository (master branch).
+    #: ``fin plugs install <name>`` fetches ``<base>/plugs/<name>.py``.
+    #: Overridable for forks/mirrors and tests via ``FIN_PLUGS_REPO_RAW``.
+    PLUGS_REPO_RAW: str = os.environ.get(
+        "FIN_PLUGS_REPO_RAW",
+        "https://raw.githubusercontent.com/sharanvelu/fin-plugs/master",
+    )
+
+    #: URL of the catalog index used by ``fin plugs search``. Published as a
+    #: release asset of the plug repository (not committed to master); the
+    #: ``releases/latest/download`` URL always redirects to the newest
+    #: release's copy. Overridable via ``FIN_PLUGS_CATALOG_URL``.
+    PLUGS_CATALOG_URL: str = os.environ.get(
+        "FIN_PLUGS_CATALOG_URL",
+        "https://github.com/sharanvelu/fin-plugs/releases/latest/download/catalog.json",
+    )
 
     #: Persisted per-asset enable/disable flags (see `fin config`).
     CONFIG_FILE: Path = DATA_DIR / "config.json"
@@ -99,8 +110,3 @@ class Config:
         """
         return cls.DATA_DIR / "certs"
 
-    @classmethod
-    def plug_type_dir(cls, plug_type: str) -> Path:
-        """Return the directory for a given plug type (APP/ASSET/GLOBAL)."""
-        sub = cls.PLUG_TYPE_DIRS.get(plug_type.upper(), plug_type)
-        return cls.PLUGS_DIR / sub

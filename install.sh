@@ -145,20 +145,24 @@ else
 fi
 
 # --- seed plugs -------------------------------------------------------------
-# Plugs live in ~/.fin/plugs (grouped App/ Asset/ Global/). They are NOT part of
-# the binary; seed them from the plugs repo so `fin up` works out of the box.
+# Plugs live in ~/.fin/plugs as flat <name>.py files. They are NOT part of the
+# binary; seed them from the plugs repo's plugs/ directory so `fin up` works
+# out of the box. (After install, `fin plugs install <name>` adds more.)
 if [ -d "$FIN_DATA_DIR/plugs" ] && [ -n "$(ls -A "$FIN_DATA_DIR/plugs" 2>/dev/null)" ]; then
   info "Plugs already present at $FIN_DATA_DIR/plugs (leaving as-is)."
 elif command -v git >/dev/null 2>&1; then
   info "Seeding plugs into $FIN_DATA_DIR/plugs"
-  mkdir -p "$FIN_DATA_DIR"
-  if git clone --quiet "$FIN_PLUGS_REPO" "$FIN_DATA_DIR/plugs"; then
+  mkdir -p "$FIN_DATA_DIR/plugs"
+  PLUGS_TMP="$(mktemp -d)"
+  if git clone --quiet --depth 1 "$FIN_PLUGS_REPO" "$PLUGS_TMP/fin-plugs" \
+     && cp "$PLUGS_TMP/fin-plugs/plugs/"*.py "$FIN_DATA_DIR/plugs/"; then
     ok "Plugs installed."
   else
-    warn "Could not clone plugs from $FIN_PLUGS_REPO — install them manually into $FIN_DATA_DIR/plugs."
+    warn "Could not seed plugs from $FIN_PLUGS_REPO — install them with 'fin plugs install <name>'."
   fi
+  rm -rf "$PLUGS_TMP"
 else
-  warn "git not found — install plugs manually into $FIN_DATA_DIR/plugs (App/ Asset/ Global/)."
+  warn "git not found — install plugs with 'fin plugs install <name>' instead."
 fi
 
 # --- PATH hint --------------------------------------------------------------

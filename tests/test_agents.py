@@ -37,7 +37,6 @@ def project(tmp_path, monkeypatch, plug_factory):
     plugs_dir = tmp_path / "plugs"
     plug_factory(
         plugs_dir,
-        type_sub="App",
         name="demo",
         class_name="DemoPlug",
         plug_type="APP",

@@ -52,7 +52,8 @@ a declarative plugin system, and a single audited path to the Docker daemon.
 - **Docker** running locally (Docker Desktop, Colima, Rancher Desktop, or Podman
   with a Docker-compatible socket — Fin auto-detects the common socket paths).
 - **git** — used by the installer to seed the bundled plugs, and by
-  `fin plugs install`. (Optional: if git is missing, install plugs manually.)
+  `fin plugs install <git-url>`. (Optional: catalog installs like
+  `fin plugs install laravel` fetch over plain HTTPS and need no git.)
 
 > The prebuilt binary needs **no Python, pip, or virtualenv** on the host.
 > Python 3.11+ is only required if you install [from source](#install-from-source-developers).
@@ -86,9 +87,10 @@ The installer:
 5. Runs `fin --version` once — the first launch of the unsigned binary is slow
    (~15s while the OS verifies it), so the installer pays that cost up front
    and your first real `fin` command starts instantly.
-6. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by `git clone`-ing
-   the `sharanvelu/fin-plugs` repo — only if `~/.fin/plugs` is absent and `git`
-   is available.
+6. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by copying
+   the flat `plugs/*.py` files from a shallow clone of the `sharanvelu/fin-plugs`
+   repo — only if `~/.fin/plugs` is absent and `git` is available. (More plugs:
+   `fin plugs install <name>`.)
 
 Installer environment overrides:
 
@@ -114,7 +116,8 @@ xattr -dr com.apple.quarantine ~/.local/lib/fin-cli/fin     # macOS only (unsign
 ln -sf ~/.local/lib/fin-cli/fin/fin ~/.local/bin/fin        # or any writable dir on your PATH
 
 # Seed the plugs (not bundled in the binary):
-git clone https://github.com/sharanvelu/fin-plugs.git ~/.fin/plugs
+git clone --depth 1 https://github.com/sharanvelu/fin-plugs.git /tmp/fin-plugs
+mkdir -p ~/.fin/plugs && cp /tmp/fin-plugs/plugs/*.py ~/.fin/plugs/
 
 fin --help
 ```
@@ -152,7 +155,7 @@ For development, plugs still load from the fixed `~/.fin/plugs` directory
 your plugs checkout once:
 
 ```bash
-ln -s <fin-plugs repo>/plugs-tree ~/.fin/plugs
+ln -s <fin-plugs repo>/plugs ~/.fin/plugs
 ```
 
 ## Quickstart (Laravel)
@@ -259,8 +262,8 @@ delegated to a plug.
 | ------- | ----------- |
 | `fin plugs list` (alias `ls`) | List installed plugs and their commands. |
 | `fin plugs info <name>` | Show one plug's metadata and path. |
-| `fin plugs search <query>` | Search the remote catalog *(not yet wired up — reports a clear message)*. |
-| `fin plugs install <name\|git-url>` | Install a plug from a git URL (catalog install pending). |
+| `fin plugs search <query>` | Search the remote plug catalog by name/description. |
+| `fin plugs install <name\|git-url>` | Install a plug by catalog name (e.g. `fin plugs install laravel`) or from a git URL. |
 | `fin plugs uninstall <name>` | Remove an installed plug from disk. |
 
 ### AI agents
@@ -411,26 +414,32 @@ fin <command> [args...]
   1. reserved (system) commands   ← owned by Fin, never delegated
   2. the FIN_APP / FIN_PLUG plug   ← primary app plug
   3. the FIN_PLUGS plugs           ← auxiliary plugs, in declared order
-  4. GLOBAL plugs                  ← everything under Global/
+  4. GLOBAL plugs                  ← every plug declaring PlugType.GLOBAL
 ```
 
 The first match wins. Plug lookup is lazy and de-duplicated by plug name.
 
 ## Writing a plug
 
-A plug is a Python package under the plugs directory, grouped by type:
+A plug is a single Python file in the plugs directory; its type is declared
+by the class's `plug_type` attribute, not by where the file sits:
 
 ```
 <PLUGS_DIR>/
-  App/<name>/__init__.py      # PlugType.APP
-  Asset/<name>/__init__.py    # PlugType.ASSET
-  Global/<name>/__init__.py   # PlugType.GLOBAL
+  <name>.py                   # one FinPlug subclass; filename == plug name
 ```
 
 `PLUGS_DIR` is fixed at `~/.fin/plugs` (it moves with `FIN_DATA_DIR`). The loader
-imports each package by file path, finds the single class that subclasses
+imports each file by path, finds the single class that subclasses
 `FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and calls
 `setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
+
+Catalog plugs come from the [fin-plugs](https://github.com/sharanvelu/fin-plugs)
+repository: `fin plugs install <name>` fetches `plugs/<name>.py` from its
+master branch over plain HTTPS, and `fin plugs search` reads the generated
+`catalog.json` published as an asset of the repo's latest release. Point
+`FIN_PLUGS_REPO_RAW` (plug files) and `FIN_PLUGS_CATALOG_URL` (catalog) at a
+fork/mirror to install from somewhere else.
 
 **Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
 objects and asks `PlugContext` to exec inside a running container — it must never
@@ -439,7 +448,7 @@ daemon.
 
 ### Minimal ASSET plug
 
-`Asset/memcached/__init__.py`:
+`<PLUGS_DIR>/memcached.py`:
 
 ```python
 from __future__ import annotations
@@ -470,7 +479,7 @@ Enable it to auto-start with `fin config enable memcached`, or list it in
 
 ### Minimal APP plug
 
-`App/static/__init__.py`:
+`<PLUGS_DIR>/static.py`:
 
 ```python
 from __future__ import annotations
@@ -587,7 +596,8 @@ and exits with code `2`.
 (or `FIN_PLUG`) set in the project's `.env`.
 
 **"App plug '<name>' is not installed."** — Check `fin plugs list`; ensure the
-plug exists under `App/<name>` in your plugs dir (`~/.fin/plugs`).
+plug exists in your plugs dir (`~/.fin/plugs/<name>.py`), or install it with
+`fin plugs install <name>`.
 
 **The `fin` command isn't found** — the installer warns if its chosen bin
 directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PATH"`.
