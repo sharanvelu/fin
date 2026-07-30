@@ -66,7 +66,7 @@ installer does both.
 ### One-liner (prebuilt binary)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/master/install.sh)"
 ```
 
 The installer:
@@ -74,14 +74,19 @@ The installer:
 1. Detects your OS/arch and downloads the matching release tarball
    `fin-<os>-<arch>.tar.gz` (`os` ∈ `macos`/`linux`, `arch` ∈ `arm64`/`x64`)
    from the GitHub Releases of `sharanvelu/fin`.
-2. Unpacks it into `~/.fin-cli` (override with `FIN_HOME_DIR`), giving
-   `~/.fin-cli/fin/fin` plus its `_internal/` runtime.
+2. Unpacks it into `~/.local/lib/fin-cli` (created if missing; override with
+   `FIN_HOME_DIR`), giving `~/.local/lib/fin-cli/fin/fin` plus its
+   `_internal/` runtime. The whole install is user-local — the installer
+   never uses `sudo`.
 3. Symlinks the `fin` launcher into the first writable directory on your `PATH`
    (tries `/usr/local/bin`, `~/.local/bin`, `~/bin`, `~/.bin`; override with
    `FIN_BIN_DIR`).
 4. On macOS, strips the `com.apple.quarantine` attribute so the unsigned binary
    runs without a Gatekeeper prompt.
-5. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by `git clone`-ing
+5. Runs `fin --version` once — the first launch of the unsigned binary is slow
+   (~15s while the OS verifies it), so the installer pays that cost up front
+   and your first real `fin` command starts instantly.
+6. Seeds plugs into `~/.fin/plugs` (override with `FIN_DATA_DIR`) by `git clone`-ing
    the `sharanvelu/fin-plugs` repo — only if `~/.fin/plugs` is absent and `git`
    is available.
 
@@ -90,7 +95,7 @@ Installer environment overrides:
 | Variable           | Purpose                                     | Default                            |
 | ------------------ | ------------------------------------------- | ---------------------------------- |
 | `FIN_VERSION`      | release to install — `latest` = the rolling prerelease pointing at the newest versioned release; a version like `0.1.0` pins the immutable `v0.1.0` release | `latest`                         |
-| `FIN_HOME_DIR`     | binary install location                     | `$HOME/.fin-cli`                   |
+| `FIN_HOME_DIR`     | binary install location                     | `$HOME/.local/lib/fin-cli`         |
 | `FIN_BIN_DIR`      | where to place the `fin` symlink            | auto-detected writable `PATH` dir  |
 | `FIN_DATA_DIR`     | per-user data dir (config, registry, plugs) | `$HOME/.fin`                       |
 | `FIN_RELEASE_REPO` | GitHub repo hosting the releases            | `sharanvelu/fin`                   |
@@ -103,9 +108,10 @@ If you'd rather not pipe a script, grab the tarball for your platform from the
 
 ```bash
 # Pick the artifact for your platform, e.g. fin-macos-arm64.tar.gz
-tar -C ~/.fin-cli -xzf fin-macos-arm64.tar.gz     # → ~/.fin-cli/fin/fin + _internal/
-xattr -dr com.apple.quarantine ~/.fin-cli/fin     # macOS only (unsigned binary)
-ln -sf ~/.fin-cli/fin/fin /usr/local/bin/fin      # or any writable dir on your PATH
+mkdir -p ~/.local/lib/fin-cli ~/.local/bin
+tar -C ~/.local/lib/fin-cli -xzf fin-macos-arm64.tar.gz     # → fin/fin + _internal/
+xattr -dr com.apple.quarantine ~/.local/lib/fin-cli/fin     # macOS only (unsigned binary)
+ln -sf ~/.local/lib/fin-cli/fin/fin ~/.local/bin/fin        # or any writable dir on your PATH
 
 # Seed the plugs (not bundled in the binary):
 git clone https://github.com/sharanvelu/fin-plugs.git ~/.fin/plugs

@@ -7,17 +7,20 @@
 # separately into ~/.fin/plugs (this script seeds them from the fin-plugs repo).
 #
 # Usage:
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/main/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sharanvelu/fin/master/install.sh)"
 #
-# What it does:
+# What it does (entirely user-local — never uses sudo):
 #   1. Detects OS/arch and downloads the matching release tarball.
-#   2. Unpacks it to ${FIN_HOME_DIR:-$HOME/.fin-cli}.
+#   2. Unpacks it to ${FIN_HOME_DIR:-$HOME/.local/lib/fin-cli}, creating the
+#      directory if needed.
 #   3. Symlinks the `fin` launcher into the first writable PATH directory.
-#   4. Seeds plugs into ~/.fin/plugs (clones fin-plugs if git is available).
+#   4. Runs `fin --version` once so the slow first launch of the unsigned
+#      binary happens here, not on the user's first command.
+#   5. Seeds plugs into ~/.fin/plugs (clones fin-plugs if git is available).
 #
 # Configurable via environment variables:
 #   FIN_VERSION       release to install ("latest" or e.g. 0.1.0)  (default: latest)
-#   FIN_HOME_DIR      install location                             (default: $HOME/.fin-cli)
+#   FIN_HOME_DIR      install location                             (default: $HOME/.local/lib/fin-cli)
 #   FIN_BIN_DIR       where to place the `fin` symlink             (default: auto-detected)
 #   FIN_DATA_DIR      per-user data dir (config, registry, plugs)  (default: $HOME/.fin)
 #   FIN_RELEASE_REPO  GitHub repo hosting the releases             (default: sharanvelu/fin)
@@ -27,7 +30,7 @@ set -euo pipefail
 
 FIN_VERSION="${FIN_VERSION:-latest}"
 FIN_VERSION="${FIN_VERSION#v}"   # tolerate a leading "v" (release tags are vX.Y.Z)
-FIN_HOME_DIR="${FIN_HOME_DIR:-$HOME/.fin-cli}"
+FIN_HOME_DIR="${FIN_HOME_DIR:-$HOME/.local/lib/fin-cli}"
 FIN_DATA_DIR="${FIN_DATA_DIR:-$HOME/.fin}"
 FIN_RELEASE_REPO="${FIN_RELEASE_REPO:-sharanvelu/fin}"
 FIN_PLUGS_REPO="${FIN_PLUGS_REPO:-https://github.com/sharanvelu/fin-plugs.git}"
@@ -80,8 +83,13 @@ trap 'rm -rf "$TMP"' EXIT
 info "Downloading $ARTIFACT ($FIN_VERSION)…"
 DL "$URL" "$TMP/$ARTIFACT" || die "Download failed: $URL"
 
+# The install is entirely user-local: never escalate to sudo. If the target
+# isn't creatable/writable, fail with a hint instead of prompting for a password.
 info "Installing into $FIN_HOME_DIR"
-mkdir -p "$FIN_HOME_DIR"
+mkdir -p "$FIN_HOME_DIR" 2>/dev/null \
+  || die "Cannot create $FIN_HOME_DIR (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
+[ -w "$FIN_HOME_DIR" ] \
+  || die "$FIN_HOME_DIR is not writable (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
 rm -rf "$FIN_HOME_DIR/fin"                 # clean previous install (idempotent)
 tar -C "$FIN_HOME_DIR" -xzf "$TMP/$ARTIFACT"
 [ -x "$FIN_HOME_DIR/fin/fin" ] || die "Unexpected archive layout (missing fin/fin)."
@@ -108,7 +116,8 @@ pick_bin_dir() {
       "$HOME"/*) mkdir -p "$d" 2>/dev/null && echo "$d" && return ;;
     esac
   done
-  echo "/usr/local/bin"
+  # Last resort: a user-owned bin dir we can always create (never sudo).
+  echo "$HOME/.local/bin"
 }
 
 BIN_DIR="$(pick_bin_dir)"
@@ -116,15 +125,24 @@ LINK_PATH="$BIN_DIR/fin"
 TARGET="$FIN_HOME_DIR/fin/fin"
 
 info "Linking $LINK_PATH -> $TARGET"
-if [ -w "$BIN_DIR" ] || [ ! -e "$BIN_DIR" ]; then
-  mkdir -p "$BIN_DIR" 2>/dev/null || true
+mkdir -p "$BIN_DIR" 2>/dev/null || true
+if [ -d "$BIN_DIR" ] && [ -w "$BIN_DIR" ]; then
   ln -sf "$TARGET" "$LINK_PATH"
 else
-  warn "$BIN_DIR is not writable; using sudo for the symlink."
-  sudo mkdir -p "$BIN_DIR" || die "Could not create $BIN_DIR (sudo required)."
-  sudo ln -sf "$TARGET" "$LINK_PATH" || die "Could not symlink fin into $BIN_DIR (sudo required)."
+  die "$BIN_DIR is not writable (this installer never uses sudo). Set FIN_BIN_DIR to a writable directory on your PATH."
 fi
 ok "Linked fin into $BIN_DIR"
+
+# --- warm-up first run -------------------------------------------------------
+# The binary is not code-signed, so the OS verifies it on first launch — which
+# can take ~15s (macOS Gatekeeper scan of the unpacked runtime). Run it once
+# here so the user's first real `fin` command starts instantly.
+info "Warming up fin…"
+if "$TARGET" --version >/dev/null 2>&1; then
+  ok "Fin Warmed-up."
+else
+  warn "Warm-up run failed; your first manual run of fin may be slow."
+fi
 
 # --- seed plugs -------------------------------------------------------------
 # Plugs live in ~/.fin/plugs (grouped App/ Asset/ Global/). They are NOT part of

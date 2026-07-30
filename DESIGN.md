@@ -336,9 +336,11 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   `pyproject.toml` changes on master) and attaches the tarballs to the
   GitHub Release.
   `install.sh` detects OS/arch, downloads the matching tarball from
-  `sharanvelu/fin` Releases, unpacks it to `~/.fin-cli`, symlinks the launcher
-  onto `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
-  fix is notarization), and seeds plugs into `~/.fin/plugs`.
+  `sharanvelu/fin` Releases, unpacks it to `~/.local/lib/fin-cli` (created if
+  missing; entirely user-local, never sudo), symlinks the launcher onto
+  `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
+  fix is notarization), runs `fin --version` once to absorb the slow first
+  launch of the unsigned binary, and seeds plugs into `~/.fin/plugs`.
 - **From source (developers).** The `fin = fincli.__main__:main` console script in
   `pyproject.toml` and the repo-root `fin` bash launcher both run the module
   against system Python — no freezing step.
