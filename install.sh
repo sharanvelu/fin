@@ -12,7 +12,8 @@
 # What it does (entirely user-local — never uses sudo):
 #   1. Detects OS/arch and downloads the matching release tarball.
 #   2. Unpacks it to ${FIN_HOME_DIR:-$HOME/.local/lib/fin-cli}, creating the
-#      directory if needed.
+#      directory if needed. The tarball's top-level fin/ folder is stripped so
+#      the install dir IS the package root: fin-cli/fin + fin-cli/_internal/.
 #   3. Symlinks the `fin` launcher into the first writable PATH directory.
 #   4. Runs `fin --version` once so the slow first launch of the unsigned
 #      binary happens here, not on the user's first command.
@@ -88,15 +89,21 @@ mkdir -p "$FIN_HOME_DIR" 2>/dev/null \
   || die "Cannot create $FIN_HOME_DIR (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
 [ -w "$FIN_HOME_DIR" ] \
   || die "$FIN_HOME_DIR is not writable (this installer never uses sudo). Set FIN_HOME_DIR to a writable location."
-if [ -e "$FIN_HOME_DIR/fin/fin" ]; then INSTALL_VERB="updated"; else INSTALL_VERB="installed"; fi
-rm -rf "$FIN_HOME_DIR/fin"                 # clean previous install (idempotent)
-tar -C "$FIN_HOME_DIR" -xzf "$TMP/$ARTIFACT"
-[ -x "$FIN_HOME_DIR/fin/fin" ] || die "Unexpected archive layout (missing fin/fin)."
+# "$FIN_HOME_DIR/fin" is the executable now, but was a directory in old
+# installs — either way its presence means this is an update.
+if [ -e "$FIN_HOME_DIR/fin" ]; then INSTALL_VERB="updated"; else INSTALL_VERB="installed"; fi
+# Clean previous install (idempotent) — both the current flat layout and the
+# nested fin/ directory that installs before v0.1.6 left behind.
+rm -rf "$FIN_HOME_DIR/fin" "$FIN_HOME_DIR/_internal"
+# The tarball has a single top-level fin/ dir (the PyInstaller onedir tree);
+# strip it so FIN_HOME_DIR itself is the package root.
+tar -C "$FIN_HOME_DIR" --strip-components=1 -xzf "$TMP/$ARTIFACT"
+[ -x "$FIN_HOME_DIR/fin" ] || die "Unexpected archive layout (missing fin executable)."
 
 # macOS: strip the quarantine flag so the unsigned binary runs without a
 # Gatekeeper prompt. (The proper fix for a public release is notarization.)
 if [ "$OS" = "macos" ]; then
-  xattr -dr com.apple.quarantine "$FIN_HOME_DIR/fin" 2>/dev/null || true
+  xattr -dr com.apple.quarantine "$FIN_HOME_DIR" 2>/dev/null || true
 fi
 ok "Fin binary installed."
 
@@ -121,7 +128,7 @@ pick_bin_dir() {
 
 BIN_DIR="$(pick_bin_dir)"
 LINK_PATH="$BIN_DIR/fin"
-TARGET="$FIN_HOME_DIR/fin/fin"
+TARGET="$FIN_HOME_DIR/fin"
 
 info "Linking $LINK_PATH -> $TARGET"
 mkdir -p "$BIN_DIR" 2>/dev/null || true

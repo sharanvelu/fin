@@ -75,7 +75,7 @@ The installer:
    `fin-<os>-<arch>.tar.gz` (`os` ∈ `macos`/`linux`, `arch` ∈ `arm64`/`x64`)
    from the GitHub Releases of `sharanvelu/fin`.
 2. Unpacks it into `~/.local/lib/fin-cli` (created if missing; override with
-   `FIN_HOME_DIR`), giving `~/.local/lib/fin-cli/fin/fin` plus its
+   `FIN_HOME_DIR`), giving the `~/.local/lib/fin-cli/fin` executable plus its
    `_internal/` runtime. The whole install is user-local — the installer
    never uses `sudo`.
 3. Symlinks the `fin` launcher into the first writable directory on your `PATH`
@@ -108,9 +108,10 @@ If you'd rather not pipe a script, grab the tarball for your platform from the
 ```bash
 # Pick the artifact for your platform, e.g. fin-macos-arm64.tar.gz
 mkdir -p ~/.local/lib/fin-cli ~/.local/bin
-tar -C ~/.local/lib/fin-cli -xzf fin-macos-arm64.tar.gz     # → fin/fin + _internal/
-xattr -dr com.apple.quarantine ~/.local/lib/fin-cli/fin     # macOS only (unsigned binary)
-ln -sf ~/.local/lib/fin-cli/fin/fin ~/.local/bin/fin        # or any writable dir on your PATH
+tar -C ~/.local/lib/fin-cli --strip-components=1 \
+    -xzf fin-macos-arm64.tar.gz                             # → fin + _internal/
+xattr -dr com.apple.quarantine ~/.local/lib/fin-cli         # macOS only (unsigned binary)
+ln -sf ~/.local/lib/fin-cli/fin ~/.local/bin/fin            # or any writable dir on your PATH
 
 # Install the plugs you need (not bundled in the binary):
 fin plugs install laravel
