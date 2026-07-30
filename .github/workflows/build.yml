@@ -6,10 +6,10 @@
 # exactly once from vetted code.
 #
 # Runs ONLY at v* tags — one build per release, nothing on ordinary master
-# pushes. Each release publishes twice from the same artifacts:
-#   1. the immutable vX.Y.Z release
-#   2. a refresh of the rolling `latest` prerelease, which is what install.sh
-#      downloads by default (its tag is force-moved to the release commit)
+# pushes. Each run publishes one immutable vX.Y.Z release; install.sh's
+# default ("latest") uses GitHub's native /releases/latest/ redirect, which
+# always points at the newest full release — no rolling release needed (and
+# with immutable releases enabled, a reused `latest` tag is impossible).
 #
 # Triggers:
 #   workflow_dispatch at a v* tag  → how tag.yml cuts releases (see tag.yml for
@@ -76,7 +76,7 @@ jobs:
           path: dist/fin-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
-  # One job (not per-matrix) so both releases are published atomically after
+  # One job (not per-matrix) so the release is published atomically after
   # ALL binaries built. Guarded on the tag ref so a dry-run dispatch from a
   # branch can never publish.
   release:
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write # create releases, move the `latest` tag, upload assets
+      contents: write # create the release, upload assets
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -94,6 +94,8 @@ jobs:
           merge-multiple: true
           path: dist
 
+      # Published as a full (non-pre) release so GitHub's native
+      # /releases/latest/ redirect — install.sh's default — picks it up.
       - name: Publish ${{ github.ref_name }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -104,18 +106,3 @@ jobs:
             --notes "Fin $GITHUB_REF_NAME" \
             --verify-tag \
           || gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz --clobber
-
-      - name: Refresh the rolling `latest` release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          # install.sh downloads the `latest` prerelease by default. Delete the
-          # old release + tag (ignore if absent), then recreate the tag at the
-          # commit this release was built from, with the same assets.
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest dist/*.tar.gz \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Latest build ($GITHUB_REF_NAME)" \
-            --notes "Rolling pointer to the newest release ($GITHUB_REF_NAME, \`${GITHUB_SHA}\`). Install a v* release for a pinned build."

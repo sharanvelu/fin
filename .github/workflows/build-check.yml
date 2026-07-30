@@ -1,5 +1,5 @@
 # Prove the artifacts still build — WITHOUT publishing anything.
-# Publishing happens post-merge in build.yml (rolling `latest`) / tag.yml (v*).
+# Publishing happens post-merge via tag.yml → build.yml (immutable v* releases).
 #
 # Required status check: "Build Check Gate" (only the gate — both work jobs
 # are path-filtered and may legitimately be skipped).
