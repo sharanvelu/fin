@@ -17,13 +17,14 @@ fin                       bash launcher (source/dev path; sets PYTHONPATH, execs
 install.sh                installer for END USERS: downloads a prebuilt binary from Releases, symlinks it, creates ~/.fin/plugs
 packaging/build.sh        builds the standalone binary (PyInstaller onedir) → dist/fin-<os>-<arch>.tar.gz
 packaging/fin_entry.py    PyInstaller entry point (calls fincli.__main__:main)
-.github/workflows/            CI: PR gates (tests, code-style, static-analysis, build-check) + release (tag.yml → build.yml)
-pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: typer, rich, docker; dev: pytest, pytest-mock
+.github/workflows/            CI: PR gates (tests, code-style, static-analysis, build-check, pr-title, dependency-review) + codeql, dependabot auto-merge, run cleanup, release (tag.yml → build.yml); see .github/CI.md
+pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: typer, rich, docker; dev: pytest, pytest-mock, pytest-cov + pinned ruff/mypy
 fincli/
   __main__.py             entrypoint + argv dispatch (main())
   resolver.py             reserved → FIN_APP → FIN_PLUGS → GLOBAL
+  help.py                 command overview + per-command help pages
   app.py                  App singleton; EXIT_OK/EXIT_USER/EXIT_SYSTEM
-  config.py               Config: paths, network, label keys, asset creds (read from env)
+  config.py               Config: paths, network, label keys, asset creds, catalog URLs (read from env)
   core/
     docker_client.py      DockerService singleton + get_docker()
     env.py                ProjectEnv, EnvSpec/EnvVar validation
@@ -31,6 +32,8 @@ fincli/
     orchestrator.py       ContainerSpec → running container (the ONLY Docker mutator)
     proxy.py              built-in traefik:v3.6 (fin_proxy)
     database.py           auto-create DB_DATABASE in shared engine
+    wait.py               engine readiness probes (mysql_ready, postgres_ready)
+    interactive.py        TTY exec sessions (PlugContext.exec(interactive=True))
     certs.py              install ~/.fin/certs into opted-in containers
     store.py              ~/.fin/config.json asset enable flags
     errors.py             FinError + @handle_errors decorator
@@ -39,17 +42,20 @@ fincli/
   plugs/
     base.py               FinPlug, ContainerSpec, PlugCommand, PlugType
     loader.py             importlib discovery of flat PLUGS_DIR/<name>.py files
-    registry.py           SQLite cache (~/.fin/registry.db) + `fin plugs` ops
+    registry.py           SQLite cache (~/.fin/registry.db) + install/uninstall/search ops
+    catalog.py            remote fin-plugs catalog client (catalog.json + plug files over HTTPS)
     context.py            PlugContext.exec(...) inside primary container
   commands/               reserved system commands (@reserved decorator)
-plugs/                    plug source (gitignored, separate fin-plugs repo): plugs/{laravel,django,mysql,redis,postgres,minio}.py
 tests/                    pytest suite + conftest fixtures
 ```
 
 At runtime plugs load from `PLUGS_DIR`, which is fixed at `~/.fin/plugs` (it moves
-with `FIN_DATA_DIR`) — *not* the repo's `plugs/`. For development, symlink the repo
-tree there once: `ln -s "$PWD/plugs" ~/.fin/plugs`. (This keeps the tool binary/
-install immutable while plugs live in the writable user data dir.)
+with `FIN_DATA_DIR`). Plug source is **not in this repo** — it lives in the
+separate [fin-plugs](https://github.com/sharanvelu/fin-plugs) repo. Users install
+plugs with `fin plugs install <name>`; for development, symlink that checkout's
+`plugs/` dir there once: `ln -s <fin-plugs checkout>/plugs ~/.fin/plugs`. (This
+keeps the tool binary/install immutable while plugs live in the writable user
+data dir.)
 
 ## Conventions (do not violate)
 
@@ -98,8 +104,9 @@ install immutable while plugs live in the writable user data dir.)
 Add a plug when behaviour is app- or service-specific; add a reserved command
 when it's a core Fin capability. To add a plug:
 
-1. Create `<PLUGS_DIR>/{App|Asset|Global}/<name>/__init__.py` with one class
-   subclassing `FinPlug` (set `name`, `version`, `plug_type`, `description`).
+1. Create `<PLUGS_DIR>/<name>.py` with one class subclassing `FinPlug` (set
+   `name`, `version`, `plug_type`, `description`). The declared `plug_type`
+   decides whether it's APP/ASSET/GLOBAL — never the file's location.
 2. APP plugs implement `primary_spec(env) -> ContainerSpec`; ASSET plugs
    implement `asset_specs(env) -> list[ContainerSpec]` with a fixed
    `container_name`. Add `commands()` returning `{name: PlugCommand(...)}`.
@@ -142,8 +149,8 @@ python3 -m pytest          # full suite (pyproject sets -q, testpaths=tests)
 python3 -m pytest tests/test_orchestrator.py -k up    # focused run
 ```
 
-Tests are hermetic: they never touch a real daemon, `~/.fin`, or the bundled
-`plugs/`. Key fixtures in `tests/conftest.py`:
+Tests are hermetic: they never touch a real daemon, `~/.fin`, or any real
+plugs directory. Key fixtures in `tests/conftest.py`:
 
 - `mock_docker_client` — a `MagicMock` shaped like the docker SDK client
   (empty container/image/network lists, truthy `ping`, `containers.run`
@@ -152,8 +159,8 @@ Tests are hermetic: they never touch a real daemon, `~/.fin`, or the bundled
   `get_docker().client` returns the mock; returns it for assertions.
 - `make_fake_container` / `make_fake_image` (also as `fake_container` /
   `fake_image` fixtures) — build SDK-shaped mocks.
-- `write_plug` / `plug_factory` — write a minimal `FinPlug` package into a temp
-  `PLUGS_DIR`.
+- `write_plug` / `plug_factory` — write a minimal flat `<name>.py` `FinPlug`
+  file into a temp `PLUGS_DIR`.
 
 ## Gotchas
 

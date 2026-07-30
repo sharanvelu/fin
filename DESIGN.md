@@ -16,22 +16,24 @@ place that mutates the Docker daemon.
         ┌─────────────────────────────────────────────────────────┐
         │  fincli/__main__.py        entrypoint + argv dispatch     │
         │  fincli/resolver.py        reserved → APP → PLUGS → GLOBAL │
+        │  fincli/help.py            overview + per-command help    │
         └─────────────────────────────────────────────────────────┘
                      │                              │
                      ▼                              ▼
         ┌───────────────────────┐      ┌──────────────────────────┐
         │  fincli/commands       │      │  fincli/plugs             │
         │  reserved system cmds  │      │  base · loader · registry │
-        │  up · down · stop · ps │      │  context                  │
-        │  exec · logs · images  │      │  (declarative plug API)   │
-        │  config · asset · plugs│      └──────────────────────────┘
+        │  up · down · stop · ps │      │  context · catalog        │
+        │  exec · inspect · logs │      │  (declarative plug API)   │
+        │  images · config       │      └──────────────────────────┘
+        │  asset · plugs · agents│                  │
         └───────────────────────┘                  │
                      │            ┌─────────────────┘
                      ▼            ▼
         ┌─────────────────────────────────────────────────────────┐
         │  fincli/core                                              │
-        │  orchestrator  proxy  database  containers  env  store    │
-        │  docker_client (singleton)   errors                       │
+        │  orchestrator  proxy  database  containers  interactive   │
+        │  env  store  wait  certs  docker_client (singleton) errors│
         └─────────────────────────────────────────────────────────┘
                      │                              │
                      ▼                              ▼
@@ -57,6 +59,9 @@ place that mutates the Docker daemon.
   is wrapped by `@handle_errors`.
 - **`fincli/resolver.py`** — implements the resolution algorithm (§5). Produces a
   `Resolution(kind, run, source)` whose `run` is a zero-arg callable.
+- **`fincli/help.py`** — renders the top-level command overview and per-command
+  help pages, built from `ReservedCommand` metadata (`usage`, `subcommands`,
+  `options`, `examples`) and plug command metadata.
 
 ### App / config
 
@@ -67,8 +72,9 @@ place that mutates the Docker daemon.
 - **`fincli/config.py`** — `Config`, the central holder of *system*
   configuration: the network name, filesystem paths (`DATA_DIR`, `PLUGS_DIR`,
   `REGISTRY_DB`, `CONFIG_FILE`, `certs_dir()`), shared asset credentials, label
-  keys, and proxy settings. Only two values read the environment at
-  class-definition time — `FIN_DATA_DIR` and `FIN_PROXY_IMAGE`. The rest are
+  keys, proxy settings, and the remote plug-catalog URLs. Only four values read
+  the environment at class-definition time — `FIN_DATA_DIR`, `FIN_PROXY_IMAGE`,
+  `FIN_PLUGS_REPO_RAW`, and `FIN_PLUGS_CATALOG_URL`. The rest are
   fixed: the network name (`fin`), the `DATA_DIR`-relative `PLUGS_DIR` /
   `REGISTRY_DB` / `CONFIG_FILE` / `certs_dir()` (so they all move with
   `FIN_DATA_DIR`), and the shared-asset credentials (`fin` / `password`). Tests
@@ -96,6 +102,9 @@ place that mutates the Docker daemon.
   container whose `ContainerSpec` opted in (`install_certs`), via `put_archive`
   plus the distro's trust-store refresh command. Best-effort: it never fails
   `fin up`.
+- **`wait.py`** — readiness probes (`wait_for_ready`, `mysql_ready`,
+  `postgres_ready`) that poll the shared engine until it accepts connections,
+  gating database auto-creation.
 - **`store.py`** — tiny JSON store at `~/.fin/config.json` tracking which assets
   auto-start.
 - **`errors.py`** — `FinError` hierarchy and the `@handle_errors` decorator that
@@ -115,10 +124,15 @@ place that mutates the Docker daemon.
 - **`base.py`** — the `FinPlug` base class and the declarative value objects
   `ContainerSpec`, `PortMapping`, `VolumeMount`, `PlugCommand`, plus the
   `PlugType` enum (`APP`/`ASSET`/`GLOBAL`).
-- **`loader.py`** — `importlib`-based discovery over the directory-grouped tree;
-  finds the single `FinPlug` subclass per package, instantiates it, calls
-  `setup()`, and degrades gracefully on failure.
-- **`registry.py`** — the SQLite cache + the `fin plugs` operations.
+- **`loader.py`** — `importlib`-based discovery over the flat plugs directory
+  (`PLUGS_DIR/<name>.py`); imports each file, finds the single `FinPlug`
+  subclass defined in it, instantiates it, calls `setup()`, and degrades
+  gracefully on failure.
+- **`registry.py`** — the SQLite cache + the `fin plugs` operations
+  (list/info/install/uninstall/search).
+- **`catalog.py`** — the remote-catalog client: fetches `catalog.json` and
+  plug files from the fin-plugs repo over plain HTTPS
+  (`Config.PLUGS_CATALOG_URL` / `Config.PLUGS_REPO_RAW`).
 - **`context.py`** — `PlugContext`, the execution context handed to plug command
   handlers; exposes `exec(...)` to run inside the primary container. Pass
   `interactive=True` for commands that open a session the user types into
@@ -132,6 +146,15 @@ place that mutates the Docker daemon.
 Reserved system commands, each registered with the `@reserved` decorator into
 `RESERVED_COMMANDS` (by name + alias) and `RESERVED_CANONICAL` (for help). They
 read information from plugs but never let a plug perform Docker actions.
+
+### AI agents (`fincli/agents`)
+
+Backs the reserved `fin agents` command (`commands/agents_cmd.py`): renders and
+installs per-agent instruction files (`content.py` builds the content with
+command tables from the installed plugs' metadata, `targets.py` declares the
+supported agents and their file paths, `installer.py` writes them — whole-file
+for Fin-owned files, marker-block for shared files like `AGENTS.md`) so AI
+coding agents run project commands through `fin`.
 
 ## 3. The declarative-plug principle
 
@@ -161,6 +184,8 @@ plug and drives core:
 fin up
  ├─ ProjectEnv.load()                         # .env in cwd + process FIN_*/DB_*/REDIS_*
  ├─ require FIN_APP (a.k.a. FIN_PLUG)         # else FinError "Missing FIN_APP"
+ ├─ _ensure_plugs_installed(env, app)         # offer to install missing FIN_APP/FIN_PLUGS
+ │                                            # plugs from the catalog; abort if declined
  ├─ load_by_name(FIN_APP)                     # must exist and be PlugType.APP
  ├─ plug.env_spec().validate(env)             # reports ALL problems at once
  ├─ ensure_proxy()                            # idempotent traefik:v3.6 (fin_proxy)
@@ -170,8 +195,10 @@ fin up
  ├─ spec = plug.primary_spec(env)             # the ContainerSpec to run
  ├─ start_primary(spec, env)                  # labels + Traefik + cwd bind-mount + run
  │     └─ install_certs(container, spec)      # if spec.install_certs: copy ~/.fin/certs + refresh trust store
- ├─ ensure_project_database(env)              # CREATE DATABASE in shared engine if missing
- └─ success("<project> is up at http://<FIN_SITE>")
+ ├─ ensure_project_database(env)              # only when assets started or DB_DATABASE is
+ │                                            # set; waits for engine readiness (core/wait.py)
+ │                                            # then CREATE DATABASE if missing
+ └─ success("<project> is up at http://<FIN_SITE>")   # or "<project> is up." without FIN_SITE
 ```
 
 `start_primary` derives the container name `<project>-<name_suffix>` (or the
@@ -277,9 +304,9 @@ free and is a stdlib dependency.
 
 ## 8. Error handling and the exit-code contract
 
-End users never see a Python traceback. Command code raises `FinError` (or
-subclasses `DockerUnavailable`, `NotFound`) for expected failures; the
-`@handle_errors` decorator on the top-level dispatch catches:
+Expected failures never surface as a Python traceback. Command code raises
+`FinError` (or subclasses `DockerUnavailable`, `NotFound`) for expected
+failures; the `@handle_errors` decorator on the top-level dispatch catches:
 
 1. `FinError` → render `exc.message` in a panel titled `exc.title`, exit
    `exc.exit_code`.
@@ -293,6 +320,9 @@ subclasses `DockerUnavailable`, `NotFound`) for expected failures; the
 | `0` (`EXIT_OK`) | success |
 | `1` (`EXIT_USER`) | user error — bad input, missing env, not-found by user fault |
 | `2` (`EXIT_SYSTEM`) | system/Docker error — daemon down, API failure |
+
+`handle_errors` catches only the classes above — a truly unexpected exception
+(a bug) still propagates as a traceback rather than being masked.
 
 `EnvSpec.validate` embodies the "report everything at once" philosophy: it
 collects *all* failing variables and raises one `FinError` listing each as a
@@ -355,7 +385,8 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   `pyproject.toml` and the repo-root `fin` bash launcher both run the module
   against system Python — no freezing step.
 
-**Plugs are never bundled.** They stay uncompiled `.py` under
-`~/.fin/plugs/{App,Asset,Global}` and are imported at runtime by the loader (§7),
-regardless of whether Fin itself is the binary or the source. Users install
-them with `fin plugs install <name>`; developers symlink their checkout there.
+**Plugs are never bundled.** They stay uncompiled `.py` files directly under
+`~/.fin/plugs` (one `<name>.py` per plug) and are imported at runtime by the
+loader (§7), regardless of whether Fin itself is the binary or the source.
+Users install them with `fin plugs install <name>`; developers symlink the
+fin-plugs checkout's `plugs/` directory there.

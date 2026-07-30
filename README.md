@@ -34,8 +34,9 @@ a declarative plugin system, and a single audited path to the Docker daemon.
 - **One command up.** `fin up` ensures the proxy, starts enabled shared assets,
   starts your app container, and creates the project database — idempotently.
 - **Plugin-driven (plugs).** Apps and services are *plugs*: small declarative
-  Python classes that describe containers and contribute commands. Bundled plugs
-  cover Laravel, MySQL, PostgreSQL and Redis; you can write your own.
+  Python classes that describe containers and contribute commands. Catalog plugs
+  cover Laravel, MySQL, PostgreSQL and Redis (`fin plugs install <name>`); you
+  can write your own.
 - **Automatic routing.** A built-in Traefik proxy routes web-exposed containers
   by hostname (`Host(...)` / wildcard `HostRegexp`) — no port juggling.
 - **Shared assets.** One MySQL/Postgres/Redis container is shared across every
@@ -230,7 +231,7 @@ delegated to a plug.
 
 | Command | Description |
 | ------- | ----------- |
-| `fin up` | Ensure the proxy, start enabled assets, start the primary app container, auto-create the DB. Requires `FIN_APP`. |
+| `fin up` | Ensure the proxy, start enabled assets, start the primary app container, auto-create the DB. Requires `FIN_APP`. Offers to install any missing `FIN_APP`/`FIN_PLUGS` plugs from the catalog first. |
 | `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. `-f`/`--force` forces removal. |
 | `fin stop [asset\|all]` | Stop containers without removing them. Same scopes as `down`. |
 | `fin config enable\|disable\|get\|list` | Manage which **asset** plugs auto-start with `up`. |
@@ -240,7 +241,7 @@ delegated to a plug.
 
 | Command | Description |
 | ------- | ----------- |
-| `fin ps` (aliases `status`, `containers`) | List running Fin containers. `-a`/`--all` includes stopped ones. |
+| `fin ps` (aliases `status`, `containers`) | List running Fin containers. `-a`/`--all` includes stopped ones; `-s`/`--stats` adds live CPU/memory columns (slower). |
 | `fin exec <cmd> [args...]` | Exec a command in the current project's primary container. When run from a real terminal, interactive sessions like `fin exec sh` / `fin exec bash` attach stdin so they behave like a normal shell (`exit`/Ctrl-D ends them); piped/non-interactive use streams output. |
 | `fin inspect [name]` | Rich JSON inspect of a container (default: the project's primary). |
 | `fin logs [name] [--follow/-f] [--tail N] [--since X]` | Tail logs (default: the project's primary). |
@@ -260,7 +261,7 @@ delegated to a plug.
 | `fin plugs list` (alias `ls`) | List installed plugs and their commands. |
 | `fin plugs info <name>` | Show one plug's metadata and path. |
 | `fin plugs search <query>` | Search the remote plug catalog by name/description. |
-| `fin plugs install <name\|git-url>` | Install a plug by catalog name (e.g. `fin plugs install laravel`) or from a git URL. |
+| `fin plugs install <name\|git-url>` | Install a plug by catalog name (e.g. `fin plugs install laravel`) or from a git URL. Refuses if already installed — `uninstall` first. |
 | `fin plugs uninstall <name>` | Remove an installed plug from disk. |
 
 ### AI agents
@@ -278,7 +279,7 @@ picks them up; re-run after changing `FIN_APP`/`FIN_PLUGS` or upgrading plugs.
 | `fin agents install [agent ...\|all]` | Generate instruction files into the current project. Default set: `claude` (`.claude/skills/fin-commands/SKILL.md`), `cursor` (`.cursor/rules/fin-commands.mdc`), `codex` (`AGENTS.md`). More via `all` or by name — see below. |
 
 Supported targets: `claude`, `cursor`, `codex`, `opencode`, `kilocode`,
-`kimi`, `antigravity`, `copilot-cli` (these six all read the cross-agent
+`kimi`, `antigravity`, `copilot-cli` (the last six all read the cross-agent
 `AGENTS.md` natively, so they share one file), `copilot` (VS Code Copilot
 Chat & coding agent — `.github/copilot-instructions.md`), `gemini`
 (`GEMINI.md`), `codebuddy` (`.codebuddy/rules/fin-commands.md`), and `aider`
@@ -343,7 +344,7 @@ Process environment variables take precedence over the `.env` file, so
 | `FIN_OVERRIDE_ASSETS` | Comma-separated assets to start, overriding the persisted enable flags. |
 | `FIN_PHP_VERSION` | *(Laravel)* PHP/image tag, e.g. `8.3`, `8.2`, `latest`. Default `latest`. |
 | `FIN_COMPOSER_VERSION` | *(Laravel)* Composer major version, `1` or `2`. Default `2`. |
-| `DB_CONNECTION`, `DB_DATABASE`, `DB_HOST`, ... | Standard Laravel DB config. `fin up` auto-creates `DB_DATABASE` in the shared MySQL/Postgres engine. |
+| `DB_CONNECTION`, `DB_DATABASE`, `DB_HOST`, ... | Standard Laravel DB config. `fin up` auto-creates `DB_DATABASE` in the shared MySQL/Postgres engine (`DB_CONNECTION` values `mysql`/`mariadb` and `postgres`/`postgresql`/`pgsql` are recognised). |
 | `REDIS_*` | Standard Redis config (parsed alongside `DB_*`). |
 
 ### System / installer variables (process environment)
@@ -522,7 +523,7 @@ class StaticPlug(FinPlug):
 
 
 def _sh(ctx: PlugContext, args: list[str]) -> int:
-    return ctx.exec(["sh"], workdir=WEBROOT)
+    return ctx.exec(["sh"], workdir=WEBROOT, interactive=True)
 ```
 
 Key points:
@@ -534,7 +535,9 @@ Key points:
   `container_name`.
 - **`commands()`** maps a name to a `PlugCommand(name, handler, help, aliases)`.
   Handlers receive `(ctx: PlugContext, args: list[str])` and return an exit code.
-  Use `ctx.exec([...], workdir=...)` to run inside the primary container.
+  Use `ctx.exec([...], workdir=...)` to run inside the primary container; pass
+  `interactive=True` for anything the user types into (shells, REPLs) —
+  without it an interactive program hangs waiting for input.
 - **`env_spec()`** declares required/optional vars, `choices`, types, and
   defaults; `EnvSpec.validate(env)` raises one friendly error listing every
   problem.
@@ -592,9 +595,11 @@ and exits with code `2`.
 **"No primary app plug configured. Set FIN_APP ..."** — `fin up` needs `FIN_APP`
 (or `FIN_PLUG`) set in the project's `.env`.
 
-**"App plug '<name>' is not installed."** — Check `fin plugs list`; ensure the
-plug exists in your plugs dir (`~/.fin/plugs/<name>.py`), or install it with
-`fin plugs install <name>`.
+**"Plugs Not Installed"** — `fin up` detects plugs named in `FIN_APP`/`FIN_PLUGS`
+that aren't installed and offers to install them from the catalog; declining
+(or a failed install) aborts with the manual `fin plugs install <name>`
+commands to run. Check what's installed with `fin plugs list`
+(`~/.fin/plugs/<name>.py`).
 
 **The `fin` command isn't found** — the installer warns if its chosen bin
 directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PATH"`.
@@ -607,6 +612,6 @@ directory isn't on your `PATH`. Add it, e.g. `export PATH="$HOME/.local/bin:$PAT
 Fin is the superhero successor to **[DockR](https://dockr.in)** and keeps its
 conventions — default `fin` / `password` credentials, the shared-asset model, and
 familiar Laravel commands — so existing muscle memory carries straight over.
-Built on [Typer](https://typer.tiangolo.com/), [Rich](https://rich.readthedocs.io/),
-the [Docker SDK for Python](https://docker-py.readthedocs.io/), and
+Built on [Rich](https://rich.readthedocs.io/), the
+[Docker SDK for Python](https://docker-py.readthedocs.io/), and
 [Traefik](https://traefik.io/). MIT licensed.

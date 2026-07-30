@@ -30,16 +30,17 @@ Dependencies point **downward**. Two invariants hold the whole system together:
         ┌────────────────────────┐      ┌────────────────────────────┐
         │  fincli/commands       │      │  fincli/plugs              │
         │  reserved system cmds  │      │  base · loader · registry  │
-        │  up · down · stop · ps │      │  context                   │
-        │  exec · logs · images  │      │  (declarative plug API)    │
-        │  config · asset · plugs│      └────────────────────────────┘
+        │  up · down · stop · ps │      │  context · catalog         │
+        │  exec · inspect · logs │      │  (declarative plug API)    │
+        │  images · config       │      └────────────────────────────┘
+        │  asset · plugs · agents│                  │
         └────────────────────────┘                  │
                      │            ┌─────────────────┘
                      ▼            ▼
         ┌────────────────────────────────────────────────────────────┐
         │  fincli/core                                               │
         │  orchestrator  proxy  database  containers  interactive    │
-        │  env  store  wait  docker_client (singleton)  errors       │
+        │  env  store  wait  certs  docker_client (singleton)  errors│
         └────────────────────────────────────────────────────────────┘
                      │                              │
                      ▼                              ▼
@@ -58,8 +59,9 @@ Dependencies point **downward**. Two invariants hold the whole system together:
 | Layer | Module(s) | Responsibility |
 | ----- | --------- | -------------- |
 | Entry / routing | `__main__.py`, `resolver.py`, `help.py` | Console entrypoint and its own argv dispatch; resolve a command **reserved → `FIN_APP` → `FIN_PLUGS` → `GLOBAL`**; render overview and per-command help. |
-| Reserved commands | `commands/` | System commands Fin owns and never delegates: `up`, `down`, `stop`, `ps`/`status`, `exec`, `inspect`, `logs`, `images`, `config`, `asset`, `plugs`. |
-| Plugin system | `plugs/base.py`, `loader.py`, `registry.py`, `context.py` | `FinPlug` base class (only its subclasses count); importlib loader with graceful failure; SQLite-cached registry over the flat `PLUGS_DIR/<name>.py` plug files; `PlugContext` that lets a plug command exec inside the primary container. |
+| Reserved commands | `commands/` | System commands Fin owns and never delegates: `up`, `down`, `stop`, `ps`/`status`, `exec`, `inspect`, `logs`, `images`, `config`, `asset`, `plugs`, `agents`. |
+| Plugin system | `plugs/base.py`, `loader.py`, `registry.py`, `context.py`, `catalog.py` | `FinPlug` base class (only its subclasses count); importlib loader with graceful failure; SQLite-cached registry over the flat `PLUGS_DIR/<name>.py` plug files, plus install/uninstall/search against the remote fin-plugs catalog (`catalog.py`); `PlugContext` that lets a plug command exec inside the primary container. |
+| AI agents | `agents/` | Renders and installs per-agent instruction files (`fin agents install`) that teach AI coding agents (Claude Code, Cursor, Codex, …) to run project commands through `fin`, with command tables built from the installed plugs' metadata. |
 | Core | `core/orchestrator.py`, `proxy.py`, `database.py`, `certs.py`, `containers.py`, `interactive.py`, `env.py`, `store.py`, `wait.py`, `docker_client.py`, `errors.py` | The only code that touches Docker. Turns plug `ContainerSpec`s into running containers; ensures the Traefik proxy; creates the project DB; installs user CA certs (`~/.fin/certs`) into opted-in containers; builds labels + Traefik routing; runs interactive exec sessions; parses `.env` and validates `FIN_*`; persists asset toggles; waits for asset readiness; wraps the Docker SDK as a singleton; renders friendly errors. |
 | UI | `ui/console.py`, `tables.py`, `spinners.py` | The single Rich `Console`; status-coloured container/image table factories; the `fin_spinner` context manager. The only printer. |
 | Identity / config | `app.py`, `config.py` | `App` singleton (name, version, network, `terminate()`); exit codes `0`/`1`/`2`; system configuration — paths, label keys, network name, shared-asset credentials, proxy image. |
@@ -73,13 +75,16 @@ fin up                     (in a project dir)
   ├─ resolver: "up" is reserved → run commands/system.up
   │
   └─ commands/system.up  (reads info from the plug; never lets it act)
+        ├─ offer to install any missing FIN_APP/FIN_PLUGS plugs from the catalog
         ├─ load the FIN_APP plug, validate its env_spec  (all errors at once)
         ├─ core/proxy.ensure_proxy()        → Traefik container (idempotent)
         ├─ core/orchestrator.start_assets_for(env)
         │     → enabled ASSET plugs' containers (fin_mysql, fin_redis, …)
         ├─ core/orchestrator.start_primary(plug.primary_spec(env), env)
-        │     → mounts cwd → spec.workdir_mount, applies FIN_* + Traefik labels
-        └─ core/database.ensure_project_database(env)
+        │     → mounts cwd → spec.workdir_mount, applies FIN_* + Traefik labels,
+        │       installs ~/.fin/certs into opted-in containers
+        └─ core/database.ensure_project_database(env)   (when assets started
+              or DB_DATABASE is set)
               → waits for readiness, then CREATE DATABASE if missing
 ```
 
