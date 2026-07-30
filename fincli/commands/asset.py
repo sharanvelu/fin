@@ -48,6 +48,8 @@ def asset(args: list[str]) -> int:
     if sub in ("stop", "down"):
         remove = sub == "down"
         force = "-f" in rest or "--force" in rest
+        if force and not remove:
+            warning("`stop` ignores -f/--force (only `down` force-removes).")
         containers = list_containers(all_=True, FIN_TYPE="asset")
         if not containers:
             info("No asset containers running.")

@@ -114,7 +114,7 @@ def resolve_enabled_assets(env: ProjectEnv) -> list[Any]:
         if lp.plug_type == PlugType.ASSET and is_asset_enabled(lp.instance.name):
             selected[lp.instance.name] = lp
 
-    # Assets explicitly listed in FIN_PLUGS are always included.
+    # Assets explicitly listed in FIN_PLUGS are also included.
     for name in env.plugs:
         lp = load_by_name(name)
         if lp and lp.plug_type == PlugType.ASSET:

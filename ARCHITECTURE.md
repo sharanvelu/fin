@@ -99,7 +99,8 @@ interactive=True)`, attaching a TTY so `exit` ends them cleanly.
 
 - **Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
   objects and asks `PlugContext` to exec — it must never import `docker` or call
-  the daemon. The orchestrator is the single audited Docker path.
+  the daemon. All Docker work goes through `get_docker().client` and the core
+  helpers, in Fin's own code.
 - **One Docker network (`fin`)** created lazily on first `up`; every container
   carries `FIN_MANAGED=true` plus `FIN_TYPE` / `FIN_SERVICE` / `FIN_SITE` /
   `FIN_PROJECT`, so listing and teardown filter precisely.

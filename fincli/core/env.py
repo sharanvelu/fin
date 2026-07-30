@@ -64,8 +64,9 @@ class ProjectEnv:
 
     Attributes:
         cwd: The directory ``fin`` was invoked from (the project root).
-        values: Merged env values — ``.env`` file overlaid by real os.environ
-            (process env wins, so ``FIN_SITE=… fin up`` works).
+        values: Merged env values — ``.env`` file overlaid by ``FIN_*``,
+            ``DB_*`` and ``REDIS_*`` process env vars (those win, so
+            ``FIN_SITE=… fin up`` works; other process vars are not overlaid).
     """
 
     cwd: Path
@@ -76,7 +77,7 @@ class ProjectEnv:
         """Load ``.env`` from *cwd* (defaults to the real current directory)."""
         cwd = (cwd or Path.cwd()).resolve()
         merged = parse_env_file(cwd / ".env")
-        # Real environment variables take precedence over the .env file.
+        # FIN_*/DB_*/REDIS_*-prefixed process vars take precedence over .env.
         for k, v in os.environ.items():
             if k.startswith(FIN_PREFIX) or k.startswith(("DB_", "REDIS_")):
                 merged[k] = v
