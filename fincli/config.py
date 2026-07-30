@@ -109,4 +109,3 @@ class Config:
         re-pointed :attr:`DATA_DIR`.
         """
         return cls.DATA_DIR / "certs"
-

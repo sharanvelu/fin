@@ -280,5 +280,3 @@ def _looks_like_git(value: str) -> bool:
     return value.startswith(
         ("http://", "https://", "git@", "ssh://")
     ) or value.endswith(".git")
-
-

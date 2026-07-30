@@ -242,8 +242,11 @@ def _make_git_plug_repo(base, files: dict[str, str]):
         "GIT_COMMITTER_EMAIL": "t@t",
         "PATH": __import__("os").environ["PATH"],
     }
-    for cmd in (["git", "init", "-q"], ["git", "add", "."],
-                ["git", "commit", "-q", "-m", "x"]):
+    for cmd in (
+        ["git", "init", "-q"],
+        ["git", "add", "."],
+        ["git", "commit", "-q", "-m", "x"],
+    ):
         subprocess.run(cmd, cwd=base, check=True, capture_output=True, env=env)
     return base
 
@@ -304,4 +307,3 @@ def test_install_from_git_refuses_already_installed(registry, tmp_path):
 )
 def test_looks_like_git(value, expected):
     assert _looks_like_git(value) is expected
-

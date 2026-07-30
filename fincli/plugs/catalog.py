@@ -43,6 +43,7 @@ def _ssl_context() -> ssl.SSLContext:
     except ImportError:  # pragma: no cover - certifi is a transitive dep
         return ssl.create_default_context()
 
+
 #: Valid plug names — these become path segments of the raw URL.
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
@@ -145,8 +146,7 @@ def fetch_plug_source(name: str) -> str:
         if suggestions:
             hint = " Did you mean: " + ", ".join(suggestions) + "?"
         raise NotFound(
-            f"No plug named '{name}' in the catalog "
-            f"({Config.PLUGS_REPO_RAW}).{hint}"
+            f"No plug named '{name}' in the catalog ({Config.PLUGS_REPO_RAW}).{hint}"
         ) from exc
 
 
