@@ -52,6 +52,7 @@ def live_panel(
         )
 
     with Live(render(), console=console, refresh_per_second=8) as live:
+
         def add(line: str) -> None:
             lines.append(line)
             live.update(render())

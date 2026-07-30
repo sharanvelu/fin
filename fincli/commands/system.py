@@ -69,7 +69,9 @@ def _ensure_plugs_installed(env: ProjectEnv, app_plug_name: str) -> None:
             for name in missing:
                 add(f"[dim]Fetching {name} from the plug catalog…[/dim]")
                 dest = registry.install(name)
-                add(f"[green]✓[/green] Installed plug [bold]{name}[/bold] [dim]({dest})[/dim]")
+                add(
+                    f"[green]✓[/green] Installed plug [bold]{name}[/bold] [dim]({dest})[/dim]"
+                )
     finally:
         registry.close()
 
