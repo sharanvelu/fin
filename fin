@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# Fin — bootstrap launcher.
+# Fin — bootstrap launcher for running Fin from a source checkout.
 #
-# This file is symlinked onto PATH (e.g. /usr/local/bin/fin) by install.sh.
+# install.sh symlinks the prebuilt binary, NOT this script; symlink this onto
+# PATH yourself for source development (e.g. ln -sf "$PWD/fin" /usr/local/bin/fin).
 # It resolves its own real location (following symlinks), puts the Fin package
 # on PYTHONPATH, and execs the Python entrypoint. No virtualenv is used or
 # required — Fin runs against the system Python 3.11+ interpreter.

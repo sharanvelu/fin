@@ -33,7 +33,7 @@ fin = "fincli.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["fincli*"]
-exclude = ["plugs*", "tests*"]
+exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

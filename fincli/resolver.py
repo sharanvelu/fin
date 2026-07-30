@@ -53,7 +53,7 @@ def _plug_lookup_order(env: ProjectEnv) -> list[LoadedPlug]:
     for plug_name in env.plugs:
         add(load_by_name(plug_name))
 
-    # 3) GLOBAL plugs (everything installed under Global/)
+    # 3) GLOBAL plugs (every loaded plug declaring plug_type GLOBAL)
     for lp in load_all():
         if lp.plug_type == PlugType.GLOBAL:
             add(lp)

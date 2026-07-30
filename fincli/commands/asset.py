@@ -23,9 +23,15 @@ from fincli.ui.console import error, info, success, warning
     subcommands=(
         ("up", "Ensure the proxy and start every enabled asset container."),
         ("stop", "Stop all asset containers without removing them."),
-        ("down", "Stop and remove all asset containers (-f to force)."),
+        ("down", "Remove all asset containers (running ones are force-removed)."),
     ),
-    options=(("-f, --force", "Force-remove containers (with 'down')."),),
+    options=(
+        (
+            "-f, --force",
+            "With 'down': also force-remove non-running containers "
+            "(running ones are always force-removed).",
+        ),
+    ),
     examples=("fin asset up", "fin asset stop", "fin asset down -f"),
 )
 def asset(args: list[str]) -> int:

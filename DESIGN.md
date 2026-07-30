@@ -9,8 +9,8 @@ This document is the architecture deep-dive for Fin. For usage, see
 ## 1. Layered architecture
 
 Fin is organised as strict layers. Dependencies point downward; the UI layer is
-the only place that produces terminal output, and the orchestrator is the only
-place that mutates the Docker daemon.
+the only place that produces terminal output, and all Docker work goes through
+`get_docker().client` and the core helpers — plugs never touch the daemon.
 
 ```
         ┌─────────────────────────────────────────────────────────┐
@@ -125,9 +125,9 @@ place that mutates the Docker daemon.
   `ContainerSpec`, `PortMapping`, `VolumeMount`, `PlugCommand`, plus the
   `PlugType` enum (`APP`/`ASSET`/`GLOBAL`).
 - **`loader.py`** — `importlib`-based discovery over the flat plugs directory
-  (`PLUGS_DIR/<name>.py`); imports each file, finds the single `FinPlug`
-  subclass defined in it, instantiates it, calls `setup()`, and degrades
-  gracefully on failure.
+  (`PLUGS_DIR/<name>.py`); imports each file, picks the first `FinPlug`
+  subclass defined in it (further subclasses are ignored), instantiates it,
+  calls `setup()`, and degrades gracefully on failure.
 - **`registry.py`** — the SQLite cache + the `fin plugs` operations
   (list/info/install/uninstall/search).
 - **`catalog.py`** — the remote-catalog client: fetches `catalog.json` and
@@ -163,9 +163,10 @@ A plug **describes**; it never **acts**. Concretely:
 - A plug returns `ContainerSpec`/`PlugCommand` objects from `primary_spec`,
   `asset_specs`, and `commands`. It never imports `docker`, never calls
   `containers.run`, never touches the daemon.
-- The orchestrator (and `PlugContext.exec`) are the *only* code paths that talk
-  to Docker. The orchestrator attaches the standard Fin labels, wires Traefik
-  routing, mounts the project directory, and calls `run_container`.
+- The orchestrator (and `PlugContext.exec`) talk to Docker *on a plug's behalf*
+  — a plug itself never does. The orchestrator attaches the standard Fin
+  labels, wires Traefik routing, mounts the project directory, and calls
+  `run_container`.
 
 **Why.** This gives a single, auditable Docker code path. Labels, network
 membership, naming, and routing are applied uniformly regardless of which plug
@@ -209,12 +210,17 @@ idempotent: an existing container is reused (started if stopped) rather than
 recreated.
 
 `start_asset` is the shared-container variant: fixed name (`fin_<service>` or the
-spec's `container_name`), `FIN_TYPE=asset`, `FIN_PROJECT=-`.
+spec's `container_name`), `FIN_TYPE=asset`, `FIN_PROJECT=-`. When an asset spec
+is web-exposed (`web_exposed=True` + `web_port`), the host it routes at comes
+from `FIN_ASSET_SITE` in the spec's `environment` (set by the plug), defaulting
+to `<service>.localhost`.
 
 When a spec sets `install_certs`, both `start_primary` and `start_asset` then call
 `install_certs(container, spec)` (`core/certs.py`): it tars any
-`~/.fin/certs/*.{pem,crt}`, `put_archive`s them into the spec's `cert_dir`, and
-runs `cert_update_cmd` — Debian defaults, overridable per plug. It runs on every
+`~/.fin/certs/*.{pem,crt}` — renaming each to `fin-<stem>.crt`, since Debian's
+`update-ca-certificates` only ingests `.crt` files — `put_archive`s them into
+the spec's `cert_dir`, and runs `cert_update_cmd` — Debian defaults,
+overridable per plug. It runs on every
 `fin up` (idempotent) and is best-effort, so a cert problem never fails the up.
 
 ## 5. Command resolution algorithm
@@ -254,7 +260,9 @@ constrained to Fin-managed containers.
 
 For a web-exposed service with a `site` and a `port`, Fin derives a label-safe
 router **key** (`traefik_host_key`: strip `*.` and `.localhost`, replace `.`/`-`
-with `_`; `my-app.localhost` → `my_app`) and emits:
+with `_`; `my-app.localhost` → `my_app`; a host that strips to nothing, such as
+the wildcard-only `*.localhost`, falls back to the key `app` — two such sites
+would collide on the same router) and emits:
 
 ```
 traefik.enable=true
@@ -334,8 +342,9 @@ bullet, so a misconfigured `.env` is fixed in a single pass.
   commands with plug commands discovered at runtime; a fixed Typer command tree
   can't express that. Typer/Rich still power `--help` and styling. *Trade-off:*
   Fin owns more argv handling itself.
-- **Declarative plugs + single Docker path.** Plugs return data; only core
-  mutates Docker. Buys uniform labelling/routing and auditability at the cost of
+- **Declarative plugs + single Docker path.** Plugs return data; Docker is
+  mutated only through `get_docker().client` and the core helpers. Buys uniform
+  labelling/routing and auditability at the cost of
   some indirection (a plug can't do anything truly custom at the daemon level
   without extending core).
 - **Singletons for `DockerService`, `App`, `Config`.** One client, one identity,
