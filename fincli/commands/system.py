@@ -24,12 +24,65 @@ from fincli.core.orchestrator import start_assets_for, start_primary
 from fincli.core.proxy import ensure_proxy
 from fincli.plugs.base import PlugType
 from fincli.plugs.loader import load_by_name
-from fincli.ui.console import error, info, success, warning
+from fincli.ui.console import confirm, console, error, info, success, warning
 
 
 # --------------------------------------------------------------------------- #
 # up
 # --------------------------------------------------------------------------- #
+def _ensure_plugs_installed(env: ProjectEnv, app_plug_name: str) -> None:
+    """Offer to install any FIN_APP / FIN_PLUGS plugs that are missing.
+
+    If the user accepts, each missing plug is installed from the catalog via
+    the registry; if they decline, we abort with the manual install commands.
+    """
+    wanted = [app_plug_name] + [n for n in env.plugs if n != app_plug_name]
+    missing = [n for n in wanted if load_by_name(n) is None]
+    if not missing:
+        return
+
+    plural = len(missing) > 1
+    listing = ", ".join(f"[bold]{n}[/bold]" for n in missing)
+    warning(
+        f"{'These plugs are' if plural else 'This plug is'} not installed: {listing}"
+    )
+    if not confirm(
+        f"Do you want to install {'them' if plural else 'it'} to proceed?",
+        default=True,
+    ):
+        commands = "\n".join(f"  fin plugs install {n}" for n in missing)
+        raise FinError(
+            f"Cannot start without the missing plug{'s' if plural else ''}. "
+            f"Install {'them' if plural else 'it'} with:\n{commands}",
+            title="Plugs Not Installed",
+        )
+
+    from fincli.plugs.registry import Registry
+    from fincli.ui.spinners import live_panel
+
+    # The install log gets its own cyan box (mirroring the red error panel)
+    # so it stands apart from the container output that `fin up` prints next.
+    console.print()
+    registry = Registry()
+    try:
+        with live_panel("Installing plugs", border_style="cyan") as add:
+            for name in missing:
+                add(f"[dim]Fetching {name} from the plug catalog…[/dim]")
+                dest = registry.install(name)
+                add(
+                    f"[green]✓[/green] Installed plug [bold]{name}[/bold] [dim]({dest})[/dim]"
+                )
+    finally:
+        registry.close()
+
+    console.print()
+    info(
+        "You can also manage or install plugs with [bold]fin plugs "
+        "<action>[/bold] (list | info | search | install | uninstall)."
+    )
+    console.print()
+
+
 @reserved(
     "up",
     help="Start the project's containers (proxy, assets, primary).",
@@ -46,6 +99,9 @@ def up(args: list[str]) -> int:
             ".env (e.g. FIN_APP=laravel).",
             title="Missing FIN_APP",
         )
+
+    # Prompt to install any missing FIN_APP / FIN_PLUGS plugs before starting.
+    _ensure_plugs_installed(env, app_plug_name)
 
     lp = load_by_name(app_plug_name)
     if lp is None:

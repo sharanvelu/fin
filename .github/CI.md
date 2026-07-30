@@ -24,14 +24,12 @@ Every PR workflow follows the same **changes → work → gate** pattern:
 | `PR Title Lint`        | `pr-title.yml`            | Conventional Commits on the PR title (squash-merge commit message) |
 | `Dependency Review`    | `dependency-review.yml`   | blocks newly-introduced vulnerable deps (moderate+)     |
 
-Not required: `codeql.yml` (alerts to the Security tab only).
+Not required: `codeql.yml` (alerts to the Security tab only),
+`dependabot-auto-merge.yml`, and `cleanup-runs.yml` (deletes old workflow runs
+on a schedule).
 
-The ruleset definition lives in [`rulesets/master.json`](rulesets/master.json).
-Apply it with:
-
-```bash
-gh api repos/sharanvelu/fin/rulesets --input .github/rulesets/master.json
-```
+The branch ruleset (required checks on `master`) is configured in the GitHub
+UI/API — there is no ruleset JSON checked into the repo.
 
 Also enable in repo settings: **Allow auto-merge** (for
 `dependabot-auto-merge.yml`), **squash merge** as the merge method, and the
