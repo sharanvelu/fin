@@ -28,16 +28,99 @@ def test_up_requires_fin_app(monkeypatch, tmp_path):
     assert exc.value.title == "Missing FIN_APP"
 
 
-def test_up_unknown_plug(monkeypatch, tmp_path):
+def test_up_missing_plug_declined(monkeypatch, tmp_path):
+    """Declining the install prompt aborts with manual install commands."""
     monkeypatch.setattr(
         system.ProjectEnv,
         "load",
         classmethod(lambda cls: _env(tmp_path, FIN_APP="ghost")),
     )
     monkeypatch.setattr(system, "load_by_name", lambda name: None)
+    monkeypatch.setattr(system, "confirm", lambda msg, default=True: False)
     with pytest.raises(FinError) as exc:
         system.up([])
-    assert exc.value.title == "Plug Not Found"
+    assert exc.value.title == "Plugs Not Installed"
+    assert "fin plugs install ghost" in exc.value.message
+
+
+def test_up_missing_plug_installed_on_accept(monkeypatch, tmp_path):
+    """Accepting the prompt installs the missing plug and `up` proceeds."""
+    from fincli.plugs.base import ContainerSpec, FinPlug, PlugType
+
+    class MyApp(FinPlug):
+        name = "myapp"
+        plug_type = PlugType.APP
+
+        def primary_spec(self, env):
+            return ContainerSpec(
+                service="web", image="demo:latest", workdir_mount="/app"
+            )
+
+    class FakeLP:
+        plug_type = PlugType.APP
+        instance = MyApp()
+
+    installed: list[str] = []
+
+    class FakeRegistry:
+        def install(self, name):
+            installed.append(name)
+            return tmp_path / f"{name}.py"
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        system.ProjectEnv,
+        "load",
+        classmethod(lambda cls: _env(tmp_path, FIN_APP="myapp")),
+    )
+    # Missing until "installed", present afterwards.
+    monkeypatch.setattr(
+        system, "load_by_name", lambda name: FakeLP() if installed else None
+    )
+    monkeypatch.setattr(system, "confirm", lambda msg, default=True: True)
+    monkeypatch.setattr("fincli.plugs.registry.Registry", FakeRegistry)
+    monkeypatch.setattr(system, "ensure_proxy", lambda: None)
+    monkeypatch.setattr(system, "start_assets_for", lambda env: [])
+    monkeypatch.setattr(system, "start_primary", lambda spec, env: None)
+    monkeypatch.setattr(system, "ensure_project_database", lambda env: None)
+
+    rc = system.up([])
+    assert rc == EXIT_OK
+    assert installed == ["myapp"]
+
+
+def test_up_prompts_for_missing_fin_plugs(monkeypatch, tmp_path):
+    """Plugs listed in FIN_PLUGS are checked too, not just FIN_APP."""
+    from fincli.plugs.base import FinPlug, PlugType
+
+    class MyApp(FinPlug):
+        name = "myapp"
+        plug_type = PlugType.APP
+
+    class FakeLP:
+        plug_type = PlugType.APP
+        instance = MyApp()
+
+    monkeypatch.setattr(
+        system.ProjectEnv,
+        "load",
+        classmethod(
+            lambda cls: _env(tmp_path, FIN_APP="myapp", FIN_PLUGS="redis,mysql")
+        ),
+    )
+    monkeypatch.setattr(
+        system,
+        "load_by_name",
+        lambda name: FakeLP() if name == "myapp" else None,
+    )
+    monkeypatch.setattr(system, "confirm", lambda msg, default=True: False)
+    with pytest.raises(FinError) as exc:
+        system.up([])
+    assert exc.value.title == "Plugs Not Installed"
+    assert "fin plugs install redis" in exc.value.message
+    assert "fin plugs install mysql" in exc.value.message
 
 
 def test_up_wrong_plug_type(monkeypatch, tmp_path):
