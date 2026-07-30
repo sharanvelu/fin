@@ -51,9 +51,10 @@ merge PR bumping version in pyproject.toml
               never trigger `push: tags:` — dispatch is the exception)
   → build.yml builds the PyInstaller binary natively per OS/arch
               (macos-arm64, linux-x64, linux-arm64; no cross-compiling)
-              then publishes the immutable vX.Y.Z GitHub Release AND moves the
-              rolling `latest` prerelease (install.sh's default download) to
-              the same artifacts
+              then publishes the immutable vX.Y.Z GitHub Release; install.sh's
+              default download follows GitHub's native /releases/latest/
+              redirect to the newest of these (no rolling release — immutable
+              releases forbid reusing a tag like `latest`)
 ```
 
 Builds run ONLY at v* tags — ordinary pushes to master publish nothing.
