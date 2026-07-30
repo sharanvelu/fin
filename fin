@@ -20,7 +20,10 @@ while [ -h "$SOURCE" ]; do
 done
 FIN_ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
-# --- Locate a suitable Python interpreter (3.11+) ---------------------------
+# --- Locate a Python interpreter ---------------------------------------------
+# Prefers newer python3.x names but falls back to bare python3/python WITHOUT
+# verifying the version — Fin requires 3.11+, so an older fallback fails at
+# runtime rather than here.
 PYTHON_BIN="${FIN_PYTHON:-}"
 if [ -z "$PYTHON_BIN" ]; then
   for candidate in python3.13 python3.12 python3.11 python3 python; do

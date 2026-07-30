@@ -33,7 +33,7 @@ class App:
     #: Semantic version, sourced from the package.
     version: str = __version__
     #: Human-readable release date.
-    release_date: str = "2026-06-14"
+    release_date: str = "2026-07-30"
     #: Default Docker network for all containers.
     network: str = Config.NETWORK
     #: One-line tagline.

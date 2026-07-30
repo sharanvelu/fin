@@ -7,11 +7,14 @@ Discovery model — one shape, a flat directory of single-file plugs:
 
 For development, symlink the fin-plugs repo's ``plugs/`` directory to
 ``PLUGS_DIR`` (``ln -s <fin-plugs repo>/plugs ~/.fin/plugs``); installed
-plugs land in the same directory. The loader imports each file, picks the
-first class extending :class:`FinPlug` (further subclasses in the same file
-are ignored; only git-URL installs enforce a single plug), instantiates it,
-calls ``setup()``, and returns it. The plug's type is its declared ``plug_type``. Load failures
-are reported as warnings — one bad plug never crashes Fin.
+plugs land in the same directory. The loader imports each file and picks one
+class extending :class:`FinPlug`; if a file defines several, the pick is
+effectively alphabetical by class name (``inspect.getmembers`` sorts members),
+so define one plug class per file. Git-URL installs reject a repo containing
+multiple plug *files*, but a single file with two subclasses still passes.
+The loader instantiates the class, calls ``setup()``, and returns it. The
+plug's type is its declared ``plug_type``. Load failures are reported as
+warnings — one bad plug never crashes Fin.
 """
 
 from __future__ import annotations
@@ -41,7 +44,12 @@ class LoadedPlug:
 
 
 def _find_plug_class(module) -> type[FinPlug] | None:
-    """Return the FinPlug subclass defined in *module*, if any."""
+    """Return a FinPlug subclass defined in *module*, if any.
+
+    ``inspect.getmembers`` sorts classes alphabetically by name, so when a
+    module defines several subclasses the pick is alphabetical, not
+    definition order.
+    """
     for _, obj in inspect.getmembers(module, inspect.isclass):
         if issubclass(obj, FinPlug) and obj is not FinPlug:
             # Only count classes actually defined in this module (not imports).

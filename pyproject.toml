@@ -4,14 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fin-cli"
-version = "0.1.6"
+version = "0.1.7"
 description = "Fin — a fast, opinionated, plugin-driven CLI for running local development containers (Laravel, PHP, Python and more)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Fin" }]
 dependencies = [
-    "typer>=0.12",
     "rich>=13.7",
     "docker>=7.1",
 ]

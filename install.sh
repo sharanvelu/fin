@@ -16,7 +16,9 @@
 #      the install dir IS the package root: fin-cli/fin + fin-cli/_internal/.
 #   3. On macOS, strips the com.apple.quarantine attribute so the unsigned
 #      binary runs without a Gatekeeper prompt.
-#   4. Symlinks the `fin` launcher into the first writable PATH directory.
+#   4. Symlinks the `fin` binary into a bin directory: FIN_BIN_DIR if set,
+#      else the first writable well-known candidate on PATH, falling back to
+#      a user-owned dir (ultimately ~/.local/bin).
 #   5. Runs `fin --version` once so the slow first launch of the unsigned
 #      binary happens here, not on the user's first command.
 #   6. Creates the plugs directory at ~/.fin/plugs.

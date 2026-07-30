@@ -18,7 +18,7 @@ install.sh                installer for END USERS: downloads a prebuilt binary f
 packaging/build.sh        builds the standalone binary (PyInstaller onedir) → dist/fin-<os>-<arch>.tar.gz
 packaging/fin_entry.py    PyInstaller entry point (calls fincli.__main__:main)
 .github/workflows/            CI: PR gates (tests, code-style, static-analysis, build-check, pr-title, dependency-review) + codeql, dependabot auto-merge, run cleanup, release (tag.yml → build.yml); see .github/CI.md
-pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: typer, rich, docker; dev: pytest, pytest-mock, pytest-cov + pinned ruff/mypy
+pyproject.toml            packaging; [project.scripts] fin = fincli.__main__:main; deps: rich, docker; dev: pytest, pytest-mock, pytest-cov + pinned ruff/mypy
 fincli/
   __main__.py             entrypoint + argv dispatch (main())
   resolver.py             reserved → FIN_APP → FIN_PLUGS → GLOBAL
@@ -29,7 +29,7 @@ fincli/
     docker_client.py      DockerService singleton + get_docker()
     env.py                ProjectEnv, EnvSpec/EnvVar validation
     containers.py         labels, traefik labels, run_container, lookup
-    orchestrator.py       ContainerSpec → running container (the ONLY Docker mutator)
+    orchestrator.py       ContainerSpec → running container (the main Docker mutator; commands also use get_docker().client + core helpers directly)
     proxy.py              built-in traefik:v3.6 (fin_proxy)
     database.py           auto-create DB_DATABASE in shared engine
     wait.py               engine readiness probes (mysql_ready, postgres_ready)

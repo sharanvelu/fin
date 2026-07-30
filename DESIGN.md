@@ -125,9 +125,10 @@ the only place that produces terminal output, and all Docker work goes through
   `ContainerSpec`, `PortMapping`, `VolumeMount`, `PlugCommand`, plus the
   `PlugType` enum (`APP`/`ASSET`/`GLOBAL`).
 - **`loader.py`** — `importlib`-based discovery over the flat plugs directory
-  (`PLUGS_DIR/<name>.py`); imports each file, picks the first `FinPlug`
-  subclass defined in it (further subclasses are ignored), instantiates it,
-  calls `setup()`, and degrades gracefully on failure.
+  (`PLUGS_DIR/<name>.py`); imports each file, picks a `FinPlug` subclass
+  (if a file defines several, the pick is effectively alphabetical by class
+  name — define one plug class per file), instantiates it, calls `setup()`,
+  and degrades gracefully on failure.
 - **`registry.py`** — the SQLite cache + the `fin plugs` operations
   (list/info/install/uninstall/search).
 - **`catalog.py`** — the remote-catalog client: fetches `catalog.json` and
@@ -274,7 +275,9 @@ traefik.http.services.<key>_service.loadbalancer.server.port=<port>
 
 Wildcard hosts (`*.example.localhost`) become a `HostRegexp(`^.+\.example\.localhost$`)`
 rule. The proxy itself (`fin_proxy`) runs Traefik with the Docker provider
-(`exposedbydefault=false`, watching network `fin`), the `web`/`websecure`
+(`exposedbydefault=false`; `providers.docker.network=fin` sets the default
+network Traefik routes traffic over — the provider watches all labelled
+containers, not just those on `fin`), the `web`/`websecure`
 entrypoints, and the dashboard at `traefik.localhost`. Because routing is
 label-driven, starting any correctly-labelled container is sufficient to route
 it — the proxy needs no per-project configuration.
@@ -340,7 +343,7 @@ bullet, so a misconfigured `.env` is fixed in a single pass.
 
 - **Hand-rolled dispatch over pure Typer.** Resolution must blend static reserved
   commands with plug commands discovered at runtime; a fixed Typer command tree
-  can't express that. Typer/Rich still power `--help` and styling. *Trade-off:*
+  can't express that. Rich powers `--help` rendering and styling. *Trade-off:*
   Fin owns more argv handling itself.
 - **Declarative plugs + single Docker path.** Plugs return data; Docker is
   mutated only through `get_docker().client` and the core helpers. Buys uniform
@@ -385,9 +388,9 @@ Fin is delivered two ways, and a full install always has **two parts**: the
   GitHub Release.
   `install.sh` detects OS/arch, downloads the matching tarball from
   `sharanvelu/fin` Releases, unpacks it to `~/.local/lib/fin-cli` (created if
-  missing; entirely user-local, never sudo), symlinks the launcher onto
-  `PATH`, strips the macOS quarantine attribute (unsigned binary; the proper
-  fix is notarization), runs `fin --version` once to absorb the slow first
+  missing; entirely user-local, never sudo), strips the macOS quarantine
+  attribute (unsigned binary; the proper fix is notarization), symlinks the
+  binary onto `PATH`, runs `fin --version` once to absorb the slow first
   launch of the unsigned binary, and creates the plugs directory at
   `~/.fin/plugs`.
 - **From source (developers).** The `fin = fincli.__main__:main` console script in

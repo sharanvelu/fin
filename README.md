@@ -133,7 +133,7 @@ binary. This needs **Python 3.11+** on your `PATH`.
 ```bash
 git clone https://github.com/sharanvelu/fin.git
 cd fin
-python3 -m pip install --user typer rich docker   # runtime deps, no virtualenv
+python3 -m pip install --user rich docker         # runtime deps, no virtualenv
 
 # Then either run the module directly…
 python3 -m fincli --help
@@ -222,7 +222,8 @@ fin down all        # everything Fin manages
 
 > **Custom CA certificates.** Drop `.pem`/`.crt` files into `~/.fin/certs` and Fin
 > installs them into opted-in app containers on every `fin up` — each cert lands in
-> the container's trust store renamed to `fin-<name>.crt` (Debian's
+> the container's trust store renamed to `fin-<stem>.crt`, e.g. `foo.pem` →
+> `fin-foo.crt` (Debian's
 > `update-ca-certificates` only ingests `.crt` files) and the store is refreshed. Opt
 > in per plug with `ContainerSpec(install_certs=True)`; the bundled Laravel plug
 > already does. Non-Debian images override `cert_dir` / `cert_update_cmd`.
@@ -452,11 +453,13 @@ by the class's `plug_type` attribute, not by where the file sits:
 ```
 
 `PLUGS_DIR` is fixed at `~/.fin/plugs` (it moves with `FIN_DATA_DIR`). The loader
-imports each file by path, picks the first class that subclasses
-`FinPlug` (**only** `FinPlug` subclasses count; any further subclasses in the
-same file are silently ignored — only git-URL installs enforce a single plug),
-instantiates it, and calls `setup()`. A bad plug logs a warning and is skipped
-— it never crashes Fin.
+imports each file by path and picks a class that subclasses `FinPlug`
+(**only** `FinPlug` subclasses count). If a file defines several, the pick is
+effectively alphabetical by class name — so define one plug class per file.
+Git-URL installs reject a repo containing multiple plug *files*, but a single
+file with two subclasses still passes. The loader instantiates the class and
+calls `setup()`. A bad plug logs a warning and is skipped — it never crashes
+Fin.
 
 Catalog plugs come from the official
 [fin-plugs](https://github.com/sharanvelu/fin-plugs) repository — browse it (or
@@ -469,8 +472,8 @@ fork/mirror to install from somewhere else.
 
 **Plugs are declarative.** A plug returns `ContainerSpec` / `PlugCommand`
 objects and asks `PlugContext` to exec inside a running container — it must never
-call Docker itself. Fin's orchestrator is the sole code path that touches the
-daemon.
+call Docker itself. All Docker work happens in Fin's own code, through
+`get_docker().client` and the core helpers, on the plug's behalf.
 
 ### Minimal ASSET plug
 
@@ -593,7 +596,7 @@ uncompiled `.py` loaded at runtime from `~/.fin/plugs`.
 Build a tarball for the current platform:
 
 ```bash
-python3 -m pip install --user pyinstaller typer rich docker   # build + runtime deps
+python3 -m pip install --user pyinstaller rich docker   # build + runtime deps
 bash packaging/build.sh
 # → dist/fin/                    the onedir tree
 # → dist/fin-<os>-<arch>.tar.gz  the release artifact
@@ -601,7 +604,7 @@ bash packaging/build.sh
 
 `packaging/build.sh` drives PyInstaller against the entry point
 `packaging/fin_entry.py` (which calls `fincli.__main__:main`), collecting the
-`fincli` and `docker` submodules. The runtime deps (`typer`, `rich`, `docker`)
+`fincli` and `docker` submodules. The runtime deps (`rich`, `docker`)
 must be importable so PyInstaller can bundle them.
 
 > **PyInstaller cannot cross-compile** — each `fin-<os>-<arch>.tar.gz` must be
