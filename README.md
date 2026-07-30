@@ -35,12 +35,14 @@ a declarative plugin system, and a single audited path to the Docker daemon.
   starts your app container, and creates the project database — idempotently.
 - **Plugin-driven (plugs).** Apps and services are *plugs*: small declarative
   Python classes that describe containers and contribute commands. Catalog plugs
-  cover Laravel, MySQL, PostgreSQL and Redis (`fin plugs install <name>`); you
-  can write your own.
+  cover Laravel, Django, MySQL, PostgreSQL, Redis and MinIO
+  (`fin plugs install <name>`); you can write your own. See the official
+  [fin-plugs catalog](https://github.com/sharanvelu/fin-plugs) — or run
+  `fin plugs search` — for the full, up-to-date list.
 - **Automatic routing.** A built-in Traefik proxy routes web-exposed containers
   by hostname (`Host(...)` / wildcard `HostRegexp`) — no port juggling.
-- **Shared assets.** One MySQL/Postgres/Redis container is shared across every
-  project, so multiple apps reuse the same database server.
+- **Shared assets.** One MySQL/Postgres/Redis/MinIO container is shared across
+  every project, so multiple apps reuse the same database server.
 - **Friendly errors.** No raw tracebacks — Docker problems render as clean Rich
   panels with meaningful exit codes.
 - **No Python on the host.** The published Fin is a **prebuilt, standalone
@@ -212,7 +214,7 @@ fin down all        # everything Fin manages
 ```
 
 > The shared asset containers connect on their service hostnames: `DB_HOST=fin_mysql`,
-> `REDIS_HOST=fin_redis`, `fin_postgres`. Credentials are fixed at `fin` / `password`,
+> `REDIS_HOST=fin_redis`, `fin_postgres`, `fin_minio`. Credentials are fixed at `fin` / `password`,
 > shared across every project on the machine.
 
 > **Custom CA certificates.** Drop `.pem`/`.crt` files into `~/.fin/certs` and Fin
@@ -379,8 +381,8 @@ proxy is running before anything else.
 ### Assets
 
 Assets are shared, fixed-name containers (`fin_mysql`, `fin_postgres`,
-`fin_redis`) reused across all projects. Which assets start on `up` is resolved
-by:
+`fin_redis`, `fin_minio`, …) reused across all projects. Which assets start on
+`up` is resolved by:
 
 1. `FIN_OVERRIDE_ASSETS` (comma-separated) — if set, it wins outright.
 2. Otherwise, every asset explicitly enabled via `fin config enable <asset>`
@@ -432,8 +434,10 @@ imports each file by path, finds the single class that subclasses
 `FinPlug` (**only** `FinPlug` subclasses count), instantiates it, and calls
 `setup()`. A bad plug logs a warning and is skipped — it never crashes Fin.
 
-Catalog plugs come from the [fin-plugs](https://github.com/sharanvelu/fin-plugs)
-repository: `fin plugs install <name>` fetches `plugs/<name>.py` from its
+Catalog plugs come from the official
+[fin-plugs](https://github.com/sharanvelu/fin-plugs) repository — browse it (or
+run `fin plugs search`) for the full, up-to-date list of available plugs.
+`fin plugs install <name>` fetches `plugs/<name>.py` from its
 master branch over plain HTTPS, and `fin plugs search` reads the generated
 `catalog.json` published as an asset of the repo's latest release. Point
 `FIN_PLUGS_REPO_RAW` (plug files) and `FIN_PLUGS_CATALOG_URL` (catalog) at a

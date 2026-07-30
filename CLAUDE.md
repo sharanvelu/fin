@@ -3,7 +3,7 @@
 Fin (`fincli` package) is a Python 3.11+ CLI that manages local-development
 Docker containers — a plugin-driven successor to [DockR](https://dockr.in). You
 `cd` into a project, set `FIN_*` vars in `.env`, and `fin up` ensures a built-in
-Traefik proxy, starts shared assets (MySQL/Redis/Postgres), starts the app
+Traefik proxy, starts shared assets (MySQL/Redis/Postgres/MinIO), starts the app
 container, and auto-creates its database. Apps/services are **plugs**:
 declarative classes that describe containers and contribute commands but never
 touch Docker themselves — Fin's orchestrator does that on their behalf.

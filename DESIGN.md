@@ -349,8 +349,8 @@ bullet, so a misconfigured `.env` is fixed in a single pass.
   *Trade-off:* binaries must be built per OS/arch (PyInstaller can't
   cross-compile), and an unsigned macOS binary needs a quarantine-strip until it
   is notarized.
-- **Shared, fixed-name assets.** One `fin_mysql`/`fin_redis`/`fin_postgres`
-  across all projects mirrors DockR and avoids N database servers. *Trade-off:*
+- **Shared, fixed-name assets.** One `fin_mysql`/`fin_redis`/`fin_postgres`/
+  `fin_minio` across all projects mirrors DockR and avoids N database servers. *Trade-off:*
   projects share an engine (isolated by database, not by container).
 - **SQLite cache over a directory source of truth.** Fast queries without giving
   up the filesystem as canonical state; the cache is rebuildable at any time.
