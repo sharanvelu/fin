@@ -58,7 +58,8 @@ def start_primary(spec: ContainerSpec, env: ProjectEnv) -> Any:
         project=project,
     )
     if spec.web_exposed and spec.web_port and site != "-":
-        labels.update(traefik_labels(site, spec.web_port))
+        # FIN_ADDITIONAL_HOSTS hosts ride along; FIN_SITE stays the anchor.
+        labels.update(traefik_labels(site, spec.web_port, env.additional_hosts))
 
     volumes = list(spec.volumes)
     if spec.workdir_mount:

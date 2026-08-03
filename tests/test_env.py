@@ -189,6 +189,19 @@ def test_app_plug_none():
     assert env.app_plug is None
 
 
+def test_additional_hosts_parsing_and_whitespace():
+    env = ProjectEnv(
+        cwd=__import__("pathlib").Path("/x"),
+        values={"FIN_ADDITIONAL_HOSTS": " app2.localhost , app3.test ,, "},
+    )
+    assert env.additional_hosts == ["app2.localhost", "app3.test"]
+
+
+def test_additional_hosts_empty():
+    env = ProjectEnv(cwd=__import__("pathlib").Path("/x"), values={})
+    assert env.additional_hosts == []
+
+
 # --------------------------------------------------------------------------- #
 # as_bool
 # --------------------------------------------------------------------------- #

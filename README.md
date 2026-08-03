@@ -351,6 +351,7 @@ precedence over the `.env` file (other process variables are not overlaid), so
 | `FIN_APP` (a.k.a. `FIN_PLUG`) | Name of the primary **app** plug for this project (e.g. `laravel`). Required by `fin up`. |
 | `FIN_PLUGS` | Comma-separated list of auxiliary plugs to consider/start (e.g. `mysql,redis`). |
 | `FIN_SITE` | The host the app is routed at (e.g. `myapp.localhost`). Drives Traefik routing. |
+| `FIN_ADDITIONAL_HOSTS` | Comma-separated extra hosts routed to the same app container (e.g. `app2.localhost,app3.test`). Only applies when `FIN_SITE` is set — it supplements `FIN_SITE`, never replaces it. Wildcards (`*.`) work per host. |
 | `FIN_CONTAINER_NAME` | Override the project name (defaults to the cwd basename, lowercased). |
 | `FIN_OVERRIDE_ASSETS` | Comma-separated assets to start, overriding the persisted enable flags. |
 | `DB_CONNECTION`, `DB_DATABASE`, `DB_HOST`, ... | Standard Laravel DB config. `fin up` auto-creates `DB_DATABASE` in the shared MySQL/Postgres engine (`DB_CONNECTION` values `mysql`/`mariadb` and `postgres`/`postgresql`/`pgsql` are recognised). |
@@ -429,6 +430,10 @@ the host with `*.`/`.localhost` stripped and `.`/`-` replaced by `_`
 (`my-app.localhost` → `my_app`). If stripping leaves nothing (a wildcard-only
 host like `*.localhost`), the key falls back to `app` — so two such
 wildcard-only sites would collide on the same router.
+
+Each host in `FIN_ADDITIONAL_HOSTS` gets its own router (same key derivation,
+with a numeric suffix on collision) pointing at the `FIN_SITE` router's
+loadbalancer service, so every listed host reaches the same container.
 
 ### Command resolution order
 

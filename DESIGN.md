@@ -200,7 +200,8 @@ fin up
  ├─ ensure_project_database(env)              # only when assets started or DB_DATABASE is
  │                                            # set; waits for engine readiness (core/wait.py)
  │                                            # then CREATE DATABASE if missing
- └─ success("<project> is up at http://<FIN_SITE>")   # or "<project> is up." without FIN_SITE
+ └─ success("<project> is up at http://<FIN_SITE>")   # plus any FIN_ADDITIONAL_HOSTS URLs;
+                                                      # or "<project> is up." without FIN_SITE
 ```
 
 `start_primary` derives the container name `<project>-<name_suffix>` (or the
@@ -274,7 +275,14 @@ traefik.http.services.<key>_service.loadbalancer.server.port=<port>
 ```
 
 Wildcard hosts (`*.example.localhost`) become a `HostRegexp(`^.+\.example\.localhost$`)`
-rule. The proxy itself (`fin_proxy`) runs Traefik with the Docker provider
+rule.
+
+`traefik_labels` also accepts `additional_hosts` (fed from
+`FIN_ADDITIONAL_HOSTS` for primaries): each extra host gets its own router —
+same key derivation, suffixed `_2`, `_3`, … on collision — whose `service`
+points at the primary `<key>_service`, so all hosts route to the same
+container. `FIN_SITE` remains the anchor: without it, `FIN_ADDITIONAL_HOSTS`
+is ignored. The proxy itself (`fin_proxy`) runs Traefik with the Docker provider
 (`exposedbydefault=false`; `providers.docker.network=fin` sets the default
 network Traefik routes traffic over — the provider watches all labelled
 containers, not just those on `fin`), the `web`/`websecure`

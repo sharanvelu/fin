@@ -119,6 +119,47 @@ def test_traefik_labels_port_is_string():
     assert isinstance(labels[port_key], str)
 
 
+def test_traefik_labels_additional_hosts_share_service():
+    labels = traefik_labels(
+        "app.localhost", 80, additional_hosts=["app2.localhost", "app3.test"]
+    )
+    assert labels["traefik.http.routers.app2.rule"] == "Host(`app2.localhost`)"
+    assert labels["traefik.http.routers.app2.service"] == "app_service"
+    assert labels["traefik.http.routers.app2.entrypoints"] == Config.PROXY_ENTRYPOINTS
+    assert labels["traefik.http.routers.app3_test.rule"] == "Host(`app3.test`)"
+    assert labels["traefik.http.routers.app3_test.service"] == "app_service"
+    # only one loadbalancer service — all routers point at it
+    ports = [k for k in labels if "loadbalancer.server.port" in k]
+    assert ports == ["traefik.http.services.app_service.loadbalancer.server.port"]
+
+
+def test_traefik_labels_additional_host_wildcard():
+    labels = traefik_labels("app.localhost", 80, additional_hosts=["*.app.test"])
+    assert labels["traefik.http.routers.app_test.rule"].startswith("HostRegexp(")
+    assert labels["traefik.http.routers.app_test.service"] == "app_service"
+
+
+def test_traefik_labels_additional_host_key_collision_suffixed():
+    # "my-app.localhost" and "my.app.localhost" both derive key "my_app" — the
+    # additional host must not overwrite the primary router.
+    labels = traefik_labels(
+        "my-app.localhost", 80, additional_hosts=["my.app.localhost"]
+    )
+    assert labels["traefik.http.routers.my_app.rule"] == "Host(`my-app.localhost`)"
+    assert labels["traefik.http.routers.my_app_2.rule"] == "Host(`my.app.localhost`)"
+    assert labels["traefik.http.routers.my_app_2.service"] == "my_app_service"
+
+
+def test_traefik_labels_additional_hosts_blank_entries_skipped():
+    labels = traefik_labels("app.localhost", 80, additional_hosts=["", "  "])
+    routers = {k for k in labels if k.startswith("traefik.http.routers.")}
+    assert routers == {
+        "traefik.http.routers.app.rule",
+        "traefik.http.routers.app.entrypoints",
+        "traefik.http.routers.app.service",
+    }
+
+
 # --------------------------------------------------------------------------- #
 # managed_filter
 # --------------------------------------------------------------------------- #

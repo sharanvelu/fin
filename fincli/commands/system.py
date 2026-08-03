@@ -142,7 +142,10 @@ def up(args: list[str]) -> int:
 
     site = env.get("FIN_SITE")
     if site:
-        success(f"[bold]{env.project_name}[/bold] is up at [cyan]http://{site}[/cyan]")
+        urls = ", ".join(
+            f"[cyan]http://{h}[/cyan]" for h in [site, *env.additional_hosts]
+        )
+        success(f"[bold]{env.project_name}[/bold] is up at {urls}")
     else:
         success(f"[bold]{env.project_name}[/bold] is up.")
     return EXIT_OK
