@@ -58,6 +58,54 @@ def test_start_primary_applies_labels_and_mount(monkeypatch, patch_docker, tmp_p
     assert captured["volumes"][str(env.cwd)] == {"bind": "/app", "mode": "rw"}
 
 
+def test_start_primary_routes_additional_hosts(monkeypatch, patch_docker, tmp_path):
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+        from fincli.core.containers import RunResult
+
+        return RunResult(container=make_fake_container(), created=True)
+
+    monkeypatch.setattr(orch, "run_container", fake_run)
+    monkeypatch.setattr(orch, "ensure_network", lambda: None)
+
+    spec = ContainerSpec(service="web", image="demo", web_exposed=True, web_port=80)
+    env = _env(
+        tmp_path,
+        FIN_SITE="app.localhost",
+        FIN_ADDITIONAL_HOSTS="app2.localhost,app3.test",
+    )
+    orch.start_primary(spec, env)
+
+    labels = captured["labels"]
+    assert labels["traefik.http.routers.app.rule"] == "Host(`app.localhost`)"
+    assert labels["traefik.http.routers.app2.rule"] == "Host(`app2.localhost`)"
+    assert labels["traefik.http.routers.app3_test.rule"] == "Host(`app3.test`)"
+    # additional routers reuse the primary's loadbalancer service
+    assert labels["traefik.http.routers.app2.service"] == "app_service"
+    assert labels["traefik.http.routers.app3_test.service"] == "app_service"
+
+
+def test_start_primary_additional_hosts_ignored_without_site(
+    monkeypatch, patch_docker, tmp_path
+):
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+        from fincli.core.containers import RunResult
+
+        return RunResult(container=make_fake_container(), created=False)
+
+    monkeypatch.setattr(orch, "run_container", fake_run)
+    monkeypatch.setattr(orch, "ensure_network", lambda: None)
+    spec = ContainerSpec(service="web", image="demo", web_exposed=True, web_port=80)
+    env = _env(tmp_path, FIN_ADDITIONAL_HOSTS="app2.localhost")
+    orch.start_primary(spec, env)
+    assert "traefik.enable" not in captured["labels"]
+
+
 def test_start_primary_no_traefik_without_site(monkeypatch, patch_docker, tmp_path):
     captured = {}
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 from fincli.config import Config
 from fincli.core.docker_client import get_docker
@@ -77,21 +77,45 @@ def traefik_rule(site: str) -> str:
     return f"Host(`{host}`)"
 
 
-def traefik_labels(site: str, port: int) -> dict[str, str]:
+def traefik_labels(
+    site: str, port: int, additional_hosts: Sequence[str] = ()
+) -> dict[str, str]:
     """Build the full Traefik routing label set for a web-exposed service.
 
     Args:
         site: The host (from ``FIN_SITE`` for primaries, or plug spec).
         port: The container port Traefik load-balances to (from plug spec).
+        additional_hosts: Extra hosts (from ``FIN_ADDITIONAL_HOSTS``) routed to
+            the same service — each gets its own router so wildcards keep
+            working per-host.
     """
     key = traefik_host_key(site)
-    return {
+    labels = {
         "traefik.enable": "true",
         f"traefik.http.routers.{key}.rule": traefik_rule(site),
         f"traefik.http.routers.{key}.entrypoints": Config.PROXY_ENTRYPOINTS,
         f"traefik.http.routers.{key}.service": f"{key}_service",
         f"traefik.http.services.{key}_service.loadbalancer.server.port": str(port),
     }
+    used_keys = {key}
+    for host in additional_hosts:
+        host = host.strip()
+        if not host:
+            continue
+        extra_key = candidate = traefik_host_key(host)
+        # Router keys must be unique per proxy; suffix on collision (e.g. a
+        # site and an additional domain that strip to the same key).
+        n = 2
+        while candidate in used_keys:
+            candidate = f"{extra_key}_{n}"
+            n += 1
+        used_keys.add(candidate)
+        labels[f"traefik.http.routers.{candidate}.rule"] = traefik_rule(host)
+        labels[f"traefik.http.routers.{candidate}.entrypoints"] = (
+            Config.PROXY_ENTRYPOINTS
+        )
+        labels[f"traefik.http.routers.{candidate}.service"] = f"{key}_service"
+    return labels
 
 
 def managed_filter(**extra: str) -> dict[str, Any]:

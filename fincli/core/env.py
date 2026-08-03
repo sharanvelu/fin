@@ -122,6 +122,16 @@ class ProjectEnv:
         """The primary app plug name from ``FIN_APP`` (a.k.a. ``FIN_PLUG``)."""
         return self.values.get("FIN_APP") or self.values.get("FIN_PLUG")
 
+    @property
+    def additional_hosts(self) -> list[str]:
+        """The comma-separated ``FIN_ADDITIONAL_HOSTS`` list.
+
+        Extra hosts routed to the primary container alongside ``FIN_SITE``
+        (which stays required for routing — these only add to it).
+        """
+        raw = self.values.get("FIN_ADDITIONAL_HOSTS", "")
+        return [d.strip() for d in raw.split(",") if d.strip()]
+
 
 # --------------------------------------------------------------------------- #
 # Declarative env specs (per-command / per-plug requirements)
