@@ -16,6 +16,9 @@ Teardown scopes:
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
+
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import reserved
 from fincli.config import Config
@@ -29,6 +32,10 @@ from fincli.core.proxy import ensure_proxy
 from fincli.plugs.base import PlugType
 from fincli.plugs.loader import load_by_name
 from fincli.ui.console import confirm, console, error, info, success, warning
+from fincli.ui.spinners import live_checklist
+
+#: Upper bound on concurrent stop/remove operations during teardown.
+MAX_CONCURRENT_TEARDOWNS = 8
 
 
 # --------------------------------------------------------------------------- #
@@ -190,16 +197,36 @@ def _teardown(args: list[str], *, remove: bool) -> int:
         return EXIT_OK
 
     action = "Removing" if remove else "Stopping"
-    for c in containers:
-        try:
-            if remove:
-                c.remove(force=force or c.status == "running")
-            else:
-                if c.status == "running":
-                    c.stop()
-            success(f"{action[:-3]}ed [bold]{c.name}[/bold]")
-        except Exception as exc:  # noqa: BLE001 - report, keep going
-            warning(f"Could not {action.lower()[:-3]} {c.name}: {exc}")
+    done = "Removed" if remove else "Stopped"
+
+    def teardown_one(c: Any) -> None:
+        if remove:
+            c.remove(force=force or c.status == "running")
+        elif c.status == "running":
+            c.stop()
+
+    # Stops/removes run concurrently: a graceful `stop` waits up to ~10s per
+    # container, so doing them one by one scales with the container count.
+    failed = 0
+    names = [c.name for c in containers]
+    with live_checklist(f"{action} containers", names) as set_line:
+        with ThreadPoolExecutor(
+            max_workers=min(MAX_CONCURRENT_TEARDOWNS, len(containers))
+        ) as pool:
+            futures = {pool.submit(teardown_one, c): c for c in containers}
+            for future in as_completed(futures):
+                c = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:  # noqa: BLE001 - report, keep going
+                    failed += 1
+                    set_line(c.name, f"[red]✗[/red] {c.name} [dim]— {exc}[/dim]")
+                else:
+                    set_line(c.name, f"[green]✓[/green] {done} [bold]{c.name}[/bold]")
+
+    if failed:
+        verb = "remove" if remove else "stop"
+        warning(f"Could not {verb} {failed} of {len(containers)} containers.")
     return EXIT_OK
 
 
