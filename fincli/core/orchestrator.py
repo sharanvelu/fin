@@ -124,13 +124,29 @@ def resolve_enabled_assets(env: ProjectEnv) -> list[Any]:
     return list(selected.values())
 
 
-def start_assets_for(env: ProjectEnv) -> list[Any]:
-    """Start every enabled asset plug's containers. Returns started containers."""
-    started: list[Any] = []
+def asset_specs_for(env: ProjectEnv) -> list[ContainerSpec]:
+    """Resolve every enabled asset plug's ContainerSpecs without starting them.
+
+    Split out from :func:`start_assets_for` so ``up`` can collect all images
+    (and prefetch the missing ones concurrently) before any container starts.
+    """
+    specs: list[ContainerSpec] = []
     for lp in resolve_enabled_assets(env):
-        for spec in lp.instance.asset_specs(env):
-            started.append(start_asset(spec))
-    return started
+        specs.extend(lp.instance.asset_specs(env))
+    return specs
+
+
+def start_assets_for(
+    env: ProjectEnv, specs: list[ContainerSpec] | None = None
+) -> list[Any]:
+    """Start every enabled asset plug's containers. Returns started containers.
+
+    Pass *specs* (from :func:`asset_specs_for`) to reuse an earlier resolution
+    instead of asking each plug for its specs a second time.
+    """
+    if specs is None:
+        specs = asset_specs_for(env)
+    return [start_asset(spec) for spec in specs]
 
 
 def start_asset(spec: ContainerSpec, fin_type: str = "asset") -> Any:

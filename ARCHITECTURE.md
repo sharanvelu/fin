@@ -78,8 +78,10 @@ fin up                     (in a project dir)
   └─ commands/system.up  (reads info from the plug; never lets it act)
         ├─ offer to install any missing FIN_APP/FIN_PLUGS plugs from the catalog
         ├─ load the FIN_APP plug, validate its env_spec  (all errors at once)
+        ├─ core/images.prefetch_images(...)  → resolve all specs first, then pull
+        │     every missing image concurrently (proxy + assets + primary)
         ├─ core/proxy.ensure_proxy()        → Traefik container (idempotent)
-        ├─ core/orchestrator.start_assets_for(env)
+        ├─ core/orchestrator.start_assets_for(env, specs=...)
         │     → enabled ASSET plugs' containers (fin_mysql, fin_redis, …)
         ├─ core/orchestrator.start_primary(plug.primary_spec(env), env)
         │     → mounts cwd → spec.workdir_mount, applies FIN_* + Traefik labels,

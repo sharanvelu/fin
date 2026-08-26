@@ -18,11 +18,13 @@ from __future__ import annotations
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import reserved
+from fincli.config import Config
 from fincli.core.containers import list_containers
 from fincli.core.database import ensure_project_database
 from fincli.core.env import ProjectEnv
 from fincli.core.errors import FinError
-from fincli.core.orchestrator import start_assets_for, start_primary
+from fincli.core.images import prefetch_images
+from fincli.core.orchestrator import asset_specs_for, start_assets_for, start_primary
 from fincli.core.proxy import ensure_proxy
 from fincli.plugs.base import PlugType
 from fincli.plugs.loader import load_by_name
@@ -121,19 +123,24 @@ def up(args: list[str]) -> int:
     # Validate the plug's env contract (collects all problems at once).
     plug.env_spec().validate(env)
 
-    # 1) Proxy (always-on, built-in).
-    ensure_proxy()
-
-    # 2) Asset containers (enabled assets + any in FIN_PLUGS).
-    started_assets = start_assets_for(env)
-
-    # 3) Primary container (mounts cwd into the plug-defined path).
+    # Resolve every container spec first so all missing images download
+    # concurrently up front, instead of each start blocking on its own pull.
+    asset_specs = asset_specs_for(env)
     spec = plug.primary_spec(env)
     if spec is None:
         raise FinError(
             f"App plug '{app_plug_name}' did not provide a primary container spec.",
             title="Invalid Plug",
         )
+    prefetch_images([Config.PROXY_IMAGE, *(s.image for s in asset_specs), spec.image])
+
+    # 1) Proxy (always-on, built-in).
+    ensure_proxy()
+
+    # 2) Asset containers (enabled assets + any in FIN_PLUGS).
+    started_assets = start_assets_for(env, specs=asset_specs)
+
+    # 3) Primary container (mounts cwd into the plug-defined path).
     start_primary(spec, env)
 
     # 4) Auto-create the project database if applicable.

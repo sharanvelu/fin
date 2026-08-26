@@ -81,8 +81,9 @@ def test_up_missing_plug_installed_on_accept(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(system, "confirm", lambda msg, default=True: True)
     monkeypatch.setattr("fincli.plugs.registry.Registry", FakeRegistry)
+    monkeypatch.setattr(system, "prefetch_images", lambda images: None)
     monkeypatch.setattr(system, "ensure_proxy", lambda: None)
-    monkeypatch.setattr(system, "start_assets_for", lambda env: [])
+    monkeypatch.setattr(system, "start_assets_for", lambda env, specs=None: [])
     monkeypatch.setattr(system, "start_primary", lambda spec, env: None)
     monkeypatch.setattr(system, "ensure_project_database", lambda env: None)
 
@@ -166,9 +167,16 @@ def test_up_happy_path(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(system, "load_by_name", lambda name: FakeLP())
+    monkeypatch.setattr(
+        system,
+        "prefetch_images",
+        lambda images: calls.setdefault("prefetch", list(images)),
+    )
     monkeypatch.setattr(system, "ensure_proxy", lambda: calls.setdefault("proxy", True))
     monkeypatch.setattr(
-        system, "start_assets_for", lambda env: calls.setdefault("assets", []) or []
+        system,
+        "start_assets_for",
+        lambda env, specs=None: calls.setdefault("assets", []) or [],
     )
     monkeypatch.setattr(
         system, "start_primary", lambda spec, env: calls.setdefault("primary", spec)
@@ -181,6 +189,9 @@ def test_up_happy_path(monkeypatch, tmp_path):
     assert rc == EXIT_OK
     assert calls["proxy"] is True
     assert calls["primary"].image == "demo:latest"
+    # Prefetch runs before any container start and covers proxy + primary.
+    assert calls["prefetch"][0] == system.Config.PROXY_IMAGE
+    assert "demo:latest" in calls["prefetch"]
 
 
 def test_up_validates_env_contract(monkeypatch, tmp_path):

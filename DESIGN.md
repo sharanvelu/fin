@@ -190,11 +190,13 @@ fin up
  │                                            # plugs from the catalog; abort if declined
  ├─ load_by_name(FIN_APP)                     # must exist and be PlugType.APP
  ├─ plug.env_spec().validate(env)             # reports ALL problems at once
+ ├─ asset_specs_for(env) + primary_spec(env)  # resolve every ContainerSpec first
+ ├─ prefetch_images([proxy, assets, primary]) # pull all missing images concurrently
+ │                                            # (core/images.py; ThreadPoolExecutor)
  ├─ ensure_proxy()                            # idempotent traefik:v3.6 (fin_proxy)
- ├─ start_assets_for(env)                     # resolve_enabled_assets → start_asset(...)
+ ├─ start_assets_for(env, specs=...)          # start_asset(...) per resolved spec
  │     ├─ FIN_OVERRIDE_ASSETS wins, else
  │     └─ persisted enabled assets ∪ assets named in FIN_PLUGS
- ├─ spec = plug.primary_spec(env)             # the ContainerSpec to run
  ├─ start_primary(spec, env)                  # labels + Traefik + cwd bind-mount + run
  │     └─ install_certs(container, spec)      # if spec.install_certs: copy ~/.fin/certs + refresh trust store
  ├─ ensure_project_database(env)              # only when assets started or DB_DATABASE is
