@@ -9,15 +9,12 @@ Teardown scopes:
     fin down asset      → all shared asset containers
     fin down all        → every Fin-managed container
     fin stop [asset|all]→ same scopes, stop without removing
-    -f / --force        → with `down`, also force-remove non-running containers
-                          (running ones are force-removed even without it);
-                          `stop` ignores the flag
+    -f / --force        → with `down`, force-remove immediately (no graceful
+                          shutdown); without it, running containers stop
+                          gracefully before removal. `stop` ignores the flag.
 """
 
 from __future__ import annotations
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import reserved
@@ -27,15 +24,16 @@ from fincli.core.database import ensure_project_database
 from fincli.core.env import ProjectEnv
 from fincli.core.errors import FinError
 from fincli.core.images import prefetch_images
-from fincli.core.orchestrator import asset_specs_for, start_assets_for, start_primary
+from fincli.core.orchestrator import (
+    asset_specs_for,
+    start_assets_for,
+    start_primary,
+    teardown_containers,
+)
 from fincli.core.proxy import ensure_proxy
 from fincli.plugs.base import PlugType
 from fincli.plugs.loader import load_by_name
 from fincli.ui.console import confirm, console, error, info, success, warning
-from fincli.ui.spinners import live_checklist
-
-#: Upper bound on concurrent stop/remove operations during teardown.
-MAX_CONCURRENT_TEARDOWNS = 8
 
 
 # --------------------------------------------------------------------------- #
@@ -196,44 +194,18 @@ def _teardown(args: list[str], *, remove: bool) -> int:
         info("No matching Fin containers.")
         return EXIT_OK
 
-    action = "Removing" if remove else "Stopping"
-    done = "Removed" if remove else "Stopped"
-
-    def teardown_one(c: Any) -> None:
-        if remove:
-            c.remove(force=force or c.status == "running")
-        elif c.status == "running":
-            c.stop()
-
-    # Stops/removes run concurrently: a graceful `stop` waits up to ~10s per
-    # container, so doing them one by one scales with the container count.
-    failed = 0
-    names = [c.name for c in containers]
-    with live_checklist(f"{action} containers", names) as set_line:
-        with ThreadPoolExecutor(
-            max_workers=min(MAX_CONCURRENT_TEARDOWNS, len(containers))
-        ) as pool:
-            futures = {pool.submit(teardown_one, c): c for c in containers}
-            for future in as_completed(futures):
-                c = futures[future]
-                try:
-                    future.result()
-                except Exception as exc:  # noqa: BLE001 - report, keep going
-                    failed += 1
-                    set_line(c.name, f"[red]✗[/red] {c.name} [dim]— {exc}[/dim]")
-                else:
-                    set_line(c.name, f"[green]✓[/green] {done} [bold]{c.name}[/bold]")
-
+    failed = teardown_containers(containers, remove=remove, force=force)
     if failed:
         verb = "remove" if remove else "stop"
-        warning(f"Could not {verb} {failed} of {len(containers)} containers.")
+        hint = " Retry with -f to force-remove." if remove and not force else ""
+        warning(f"Could not {verb} {failed} of {len(containers)} containers.{hint}")
     return EXIT_OK
 
 
 @reserved(
     "down",
     help="Stop and remove containers. Scopes: [asset|all]. Running containers "
-    "are force-removed even without -f.",
+    "shut down gracefully before removal; -f force-removes immediately.",
     usage="fin down [asset|all] [-f]",
     subcommands=(
         ("(none)", "Remove this project's containers (app + worker)."),
@@ -243,8 +215,7 @@ def _teardown(args: list[str], *, remove: bool) -> int:
     options=(
         (
             "-f, --force",
-            "Also force-remove non-running containers "
-            "(running ones are always force-removed).",
+            "Force-remove immediately (kill) instead of waiting for graceful shutdown.",
         ),
     ),
     examples=("fin down", "fin down asset", "fin down all -f"),

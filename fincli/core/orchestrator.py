@@ -8,6 +8,7 @@ project directory, and calls Docker. Plugs never touch the daemon.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from fincli.config import Config
@@ -22,7 +23,10 @@ from fincli.core.containers import (
 from fincli.core.env import ProjectEnv
 from fincli.plugs.base import ContainerSpec, PortMapping, VolumeMount
 from fincli.ui.console import success
-from fincli.ui.spinners import fin_spinner
+from fincli.ui.spinners import fin_spinner, live_checklist
+
+#: Upper bound on concurrent stop/remove operations during teardown.
+MAX_CONCURRENT_TEARDOWNS = 8
 
 
 def _ports_to_docker(ports: list[PortMapping]) -> dict[str, Any]:
@@ -147,6 +151,58 @@ def start_assets_for(
     if specs is None:
         specs = asset_specs_for(env)
     return [start_asset(spec) for spec in specs]
+
+
+def teardown_containers(
+    containers: list[Any], *, remove: bool, force: bool = False
+) -> int:
+    """Concurrently stop — and with *remove*, delete — the given containers.
+
+    Containers tear down independently of each other, but a graceful stop
+    waits up to ~10s for the process to exit, so they run in a worker pool
+    with a live checklist updating as each one finishes. Semantics:
+
+    * ``remove=False`` — gracefully stop running containers; leave the rest.
+    * ``remove=True`` — gracefully stop running containers, then remove every
+      container (running or not).
+    * ``remove=True, force=True`` — force-remove everything immediately
+      (kill, no graceful shutdown).
+
+    Each failure renders inline on its checklist line; the number of failures
+    is returned so callers can summarise (teardown never raises per-container).
+    """
+    action = "Removing" if remove else "Stopping"
+    done = "Removed" if remove else "Stopped"
+
+    def teardown_one(c: Any) -> None:
+        if not remove:
+            if c.status == "running":
+                c.stop()
+            return
+        if force:
+            c.remove(force=True)
+            return
+        if c.status == "running":
+            c.stop()
+        c.remove()
+
+    failed = 0
+    names = [c.name for c in containers]
+    with live_checklist(f"{action} containers", names) as set_line:
+        with ThreadPoolExecutor(
+            max_workers=min(MAX_CONCURRENT_TEARDOWNS, len(containers))
+        ) as pool:
+            futures = {pool.submit(teardown_one, c): c for c in containers}
+            for future in as_completed(futures):
+                c = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:  # noqa: BLE001 - report, keep going
+                    failed += 1
+                    set_line(c.name, f"[red]✗[/red] {c.name} [dim]— {exc}[/dim]")
+                else:
+                    set_line(c.name, f"[green]✓[/green] {done} [bold]{c.name}[/bold]")
+    return failed
 
 
 def start_asset(spec: ContainerSpec, fin_type: str = "asset") -> Any:

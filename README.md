@@ -239,7 +239,7 @@ delegated to a plug.
 | Command | Description |
 | ------- | ----------- |
 | `fin up` | Ensure the proxy, start enabled assets, start the primary app container, auto-create the DB. Requires `FIN_APP`. Offers to install any missing `FIN_APP`/`FIN_PLUGS` plugs from the catalog first. |
-| `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. Running containers are force-removed even without `-f`; `-f`/`--force` also force-removes non-running ones. |
+| `fin down [asset\|all] [-f]` | Stop **and remove** containers. No scope = this project; `asset` = shared assets; `all` = everything Fin-managed. Running containers shut down gracefully before removal; `-f`/`--force` skips the graceful stop and force-removes immediately. |
 | `fin stop [asset\|all]` | Stop containers without removing them. Same scopes as `down`. (`-f` is ignored — only `down` force-removes.) |
 | `fin config enable\|disable\|get\|list` | Manage which **asset** plugs auto-start with `up`. |
 | `fin asset up\|stop\|down [-f]` | Manage the shared asset containers independently of any project. |
