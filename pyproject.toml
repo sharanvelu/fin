@@ -23,8 +23,8 @@ dev = [
     # QA tools are pinned EXACTLY: their rules/output define the CI gates, so a
     # floating release must never break unrelated PRs (ruff 0.16 changed the
     # default lint rules and did exactly that). Dependabot bumps these weekly.
-    "ruff==0.16.9",
-    "mypy==2.3.1",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
 ]
 
 [project.scripts]
