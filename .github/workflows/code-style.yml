@@ -59,7 +59,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
 
       - name: ruff check
         run: python -m ruff check --output-format=github fincli tests packaging

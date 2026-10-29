@@ -68,7 +68,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
         with:
           install-project: "false"
           extra-packages: build twine
@@ -92,7 +92,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
         with:
           extra-packages: pyinstaller
 

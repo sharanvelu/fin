@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
 
       # Runtime deps must be importable so PyInstaller can bundle them.
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
         with:
           extra-packages: pyinstaller
 

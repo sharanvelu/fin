@@ -75,7 +75,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python }}
 
@@ -97,7 +97,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: $/.github/actions/setup
+      - uses: ./.github/actions/setup
 
       # Production parity the unit suite can't give: a real SDK connection to
       # a live daemon (socket detection, ping, container listing).
