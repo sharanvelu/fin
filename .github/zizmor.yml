@@ -1,0 +1,8 @@
+# zizmor configuration (picked up automatically from .github/zizmor.yml).
+rules:
+  # zizmor 1.30+ asks for GitHub's `$/...` self-repository syntax instead of
+  # `./...`, but actionlint (latest 1.7.12) rejects `$/` as an invalid action
+  # reference. Keep `./` until actionlint supports it, then remove this entry
+  # and migrate every `uses: ./.github/actions/setup` to `uses: $/.github/...`.
+  self-repository:
+    disable: true

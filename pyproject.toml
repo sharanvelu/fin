@@ -11,20 +11,20 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Fin" }]
 dependencies = [
-    "rich>=13.7",
-    "docker>=7.1",
+    "rich>=15.0",
+    "docker>=7.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-mock>=3.12",
-    "pytest-cov>=5.0",
+    "pytest>=9.2",
+    "pytest-mock>=3.17",
+    "pytest-cov>=7.1",
     # QA tools are pinned EXACTLY: their rules/output define the CI gates, so a
     # floating release must never break unrelated PRs (ruff 0.16 changed the
     # default lint rules and did exactly that). Dependabot bumps these weekly.
-    "ruff==0.17.1",
-    "mypy==2.4.0",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
 ]
 
 [project.scripts]

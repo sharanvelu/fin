@@ -9,20 +9,27 @@ Teardown scopes:
     fin down asset      → all shared asset containers
     fin down all        → every Fin-managed container
     fin stop [asset|all]→ same scopes, stop without removing
-    -f / --force        → with `down`, also force-remove non-running containers
-                          (running ones are force-removed even without it);
-                          `stop` ignores the flag
+    -f / --force        → with `down`, force-remove immediately (no graceful
+                          shutdown); without it, running containers stop
+                          gracefully before removal. `stop` ignores the flag.
 """
 
 from __future__ import annotations
 
 from fincli.app import EXIT_OK, EXIT_USER
 from fincli.commands import reserved
+from fincli.config import Config
 from fincli.core.containers import list_containers
 from fincli.core.database import ensure_project_database
 from fincli.core.env import ProjectEnv
 from fincli.core.errors import FinError
-from fincli.core.orchestrator import start_assets_for, start_primary
+from fincli.core.images import prefetch_images
+from fincli.core.orchestrator import (
+    asset_specs_for,
+    start_assets_for,
+    start_primary,
+    teardown_containers,
+)
 from fincli.core.proxy import ensure_proxy
 from fincli.plugs.base import PlugType
 from fincli.plugs.loader import load_by_name
@@ -121,19 +128,24 @@ def up(args: list[str]) -> int:
     # Validate the plug's env contract (collects all problems at once).
     plug.env_spec().validate(env)
 
-    # 1) Proxy (always-on, built-in).
-    ensure_proxy()
-
-    # 2) Asset containers (enabled assets + any in FIN_PLUGS).
-    started_assets = start_assets_for(env)
-
-    # 3) Primary container (mounts cwd into the plug-defined path).
+    # Resolve every container spec first so all missing images download
+    # concurrently up front, instead of each start blocking on its own pull.
+    asset_specs = asset_specs_for(env)
     spec = plug.primary_spec(env)
     if spec is None:
         raise FinError(
             f"App plug '{app_plug_name}' did not provide a primary container spec.",
             title="Invalid Plug",
         )
+    prefetch_images([Config.PROXY_IMAGE, *(s.image for s in asset_specs), spec.image])
+
+    # 1) Proxy (always-on, built-in).
+    ensure_proxy()
+
+    # 2) Asset containers (enabled assets + any in FIN_PLUGS).
+    started_assets = start_assets_for(env, specs=asset_specs)
+
+    # 3) Primary container (mounts cwd into the plug-defined path).
     start_primary(spec, env)
 
     # 4) Auto-create the project database if applicable.
@@ -182,24 +194,18 @@ def _teardown(args: list[str], *, remove: bool) -> int:
         info("No matching Fin containers.")
         return EXIT_OK
 
-    action = "Removing" if remove else "Stopping"
-    for c in containers:
-        try:
-            if remove:
-                c.remove(force=force or c.status == "running")
-            else:
-                if c.status == "running":
-                    c.stop()
-            success(f"{action[:-3]}ed [bold]{c.name}[/bold]")
-        except Exception as exc:  # noqa: BLE001 - report, keep going
-            warning(f"Could not {action.lower()[:-3]} {c.name}: {exc}")
+    failed = teardown_containers(containers, remove=remove, force=force)
+    if failed:
+        verb = "remove" if remove else "stop"
+        hint = " Retry with -f to force-remove." if remove and not force else ""
+        warning(f"Could not {verb} {failed} of {len(containers)} containers.{hint}")
     return EXIT_OK
 
 
 @reserved(
     "down",
     help="Stop and remove containers. Scopes: [asset|all]. Running containers "
-    "are force-removed even without -f.",
+    "shut down gracefully before removal; -f force-removes immediately.",
     usage="fin down [asset|all] [-f]",
     subcommands=(
         ("(none)", "Remove this project's containers (app + worker)."),
@@ -209,8 +215,7 @@ def _teardown(args: list[str], *, remove: bool) -> int:
     options=(
         (
             "-f, --force",
-            "Also force-remove non-running containers "
-            "(running ones are always force-removed).",
+            "Force-remove immediately (kill) instead of waiting for graceful shutdown.",
         ),
     ),
     examples=("fin down", "fin down asset", "fin down all -f"),

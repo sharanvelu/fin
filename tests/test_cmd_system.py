@@ -81,8 +81,9 @@ def test_up_missing_plug_installed_on_accept(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(system, "confirm", lambda msg, default=True: True)
     monkeypatch.setattr("fincli.plugs.registry.Registry", FakeRegistry)
+    monkeypatch.setattr(system, "prefetch_images", lambda images: None)
     monkeypatch.setattr(system, "ensure_proxy", lambda: None)
-    monkeypatch.setattr(system, "start_assets_for", lambda env: [])
+    monkeypatch.setattr(system, "start_assets_for", lambda env, specs=None: [])
     monkeypatch.setattr(system, "start_primary", lambda spec, env: None)
     monkeypatch.setattr(system, "ensure_project_database", lambda env: None)
 
@@ -166,9 +167,16 @@ def test_up_happy_path(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(system, "load_by_name", lambda name: FakeLP())
+    monkeypatch.setattr(
+        system,
+        "prefetch_images",
+        lambda images: calls.setdefault("prefetch", list(images)),
+    )
     monkeypatch.setattr(system, "ensure_proxy", lambda: calls.setdefault("proxy", True))
     monkeypatch.setattr(
-        system, "start_assets_for", lambda env: calls.setdefault("assets", []) or []
+        system,
+        "start_assets_for",
+        lambda env, specs=None: calls.setdefault("assets", []) or [],
     )
     monkeypatch.setattr(
         system, "start_primary", lambda spec, env: calls.setdefault("primary", spec)
@@ -181,6 +189,9 @@ def test_up_happy_path(monkeypatch, tmp_path):
     assert rc == EXIT_OK
     assert calls["proxy"] is True
     assert calls["primary"].image == "demo:latest"
+    # Prefetch runs before any container start and covers proxy + primary.
+    assert calls["prefetch"][0] == system.Config.PROXY_IMAGE
+    assert "demo:latest" in calls["prefetch"]
 
 
 def test_up_validates_env_contract(monkeypatch, tmp_path):
@@ -230,7 +241,9 @@ def test_down_no_containers(monkeypatch, tmp_path):
     assert rc == EXIT_OK
 
 
-def test_down_removes_containers(monkeypatch, tmp_path):
+def test_down_removes_containers_gracefully(monkeypatch, tmp_path):
+    """Without -f: running containers stop gracefully first, then everything
+    (running or not) is removed without force."""
     c1 = make_fake_container(name="demo-web", status="running")
     c2 = make_fake_container(name="demo-worker", status="exited")
     monkeypatch.setattr(
@@ -239,19 +252,25 @@ def test_down_removes_containers(monkeypatch, tmp_path):
     monkeypatch.setattr(system, "list_containers", lambda **kw: [c1, c2])
     rc = system.down([])
     assert rc == EXIT_OK
-    c1.remove.assert_called_once()
-    c2.remove.assert_called_once()
+    c1.stop.assert_called_once()
+    c1.remove.assert_called_once_with()
+    c2.stop.assert_not_called()
+    c2.remove.assert_called_once_with()
 
 
 def test_down_force_flag(monkeypatch, tmp_path):
-    c = make_fake_container(name="demo-web", status="exited")
+    """With -f: force-remove immediately, no graceful stop — for every
+    container regardless of state."""
+    running = make_fake_container(name="demo-web", status="running")
+    exited = make_fake_container(name="demo-worker", status="exited")
     monkeypatch.setattr(
         system.ProjectEnv, "load", classmethod(lambda cls: _env(tmp_path))
     )
-    monkeypatch.setattr(system, "list_containers", lambda **kw: [c])
+    monkeypatch.setattr(system, "list_containers", lambda **kw: [running, exited])
     system.down(["-f"])
-    _, kwargs = c.remove.call_args
-    assert kwargs["force"] is True
+    running.stop.assert_not_called()
+    running.remove.assert_called_once_with(force=True)
+    exited.remove.assert_called_once_with(force=True)
 
 
 def test_down_asset_scope_filters(monkeypatch, tmp_path):
